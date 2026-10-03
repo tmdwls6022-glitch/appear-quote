@@ -117,6 +117,41 @@ function readRequestText_(sh) {
   return lines.join('\n').trim();
 }
 
+// ───────────────────────── 카톡 챗봇용 웹앱 (Supabase kakao-quote가 호출) ─────────────────────────
+// 배포: Apps Script → 배포 → 새 배포 → 웹 앱, 실행: 나, 액세스: 모든 사용자 → /exec 주소를 Supabase 비밀값 GAS_URL에.
+// 확인: 요청 본문을 GEMINI_API_KEY로 HMAC-SHA256 서명한 sig 값이 맞아야 처리. 이 함수는 외부 호출(UrlFetch)을 하지 않음.
+function doPost(e) {
+  try {
+    var body = e.postData.contents;
+    var key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+    var mine = Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(body, key, Utilities.Charset.UTF_8));
+    if (!key || (e.parameter && e.parameter.sig) !== mine) return json_({ ok: false, error: '서명 불일치' });
+    var d = JSON.parse(body);
+    if (Math.abs(Date.now() - Number(d.ts)) > 5 * 60 * 1000) return json_({ ok: false, error: '오래된 요청' });
+
+    var lock = LockService.getScriptLock(); lock.waitLock(30000);
+    try {
+      var q = buildQuote_(d.req);
+      (d.notes || []).forEach(function (n) { q.flags.push(n); });
+      assignRooms_(q, busyFromBookings_(d.bookings || []));
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty('QUOTE_SHEET_ID'));
+      var sh = copyTemplate_(ss, q);
+      fillSheet_(sh, q, d.reqText || '');
+      SpreadsheetApp.flush();
+      var t = priceTotals_(q);
+      return json_({ ok: true, sheet: sh.getName(), url: ss.getUrl() + '#gid=' + sh.getSheetId(),
+        q: { org: q.org, period: q.period, people: q.people, unit: q.unit, hall: q.hall, pensions: q.pensions,
+             ondol: q.ondol, vat: q.vat, flags: q.flags, dates: q.checkin ? scheduleLine_(q) : '',
+             extras: q.extraHalls.map(function (h) { return { name: h.name, amount: h.amount }; }) },
+        t: t });
+    } finally { lock.releaseLock(); }
+  } catch (err) {
+    return json_({ ok: false, error: String(err && err.message || err) });
+  }
+}
+function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
+
 // ───────────────────────── Gemini: 요청 읽기 ─────────────────────────
 function pickGeminiModel_() {
   var cache = CacheService.getScriptCache();
