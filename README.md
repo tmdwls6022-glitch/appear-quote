@@ -9,11 +9,11 @@
 
 고객에게 자동 발송하지 않습니다. 노란 칸과 M3 메모는 사람이 확인할 곳입니다.
 
-## 카톡 채널 챗봇 (kakao-quote)
-- `kakao-quote/index.ts`: Supabase Edge Function. 프로젝트 "room arrange"(ykujzljgaxtbwawuwoff)에 배포되어 있음.
+## 카톡 채널 챗봇 (kakao-quote) — Apps Script 없이 동작
+- `kakao-quote/`: Supabase Edge Function. 프로젝트 "room arrange"(ykujzljgaxtbwawuwoff)에 배포되어 있음.
   - 스킬 URL: https://ykujzljgaxtbwawuwoff.supabase.co/functions/v1/kakao-quote
-- 흐름: 카카오 오픈빌더 스킬 → Edge Function(Gemini로 요청 읽기, 노션 예약 확인) → 견적 시트 Apps Script 웹앱 `doPost`(가격 계산·견적 탭 작성) → 카톡 답장.
-- Supabase 비밀값(jin 직접 입력): `GEMINI_API_KEY`, `NOTION_TOKEN`, `GAS_URL`(웹앱 /exec 주소).
-- 웹앱 호출은 본문을 GEMINI_API_KEY로 HMAC 서명한 `sig`로 확인함. 두 곳의 키가 같아야 함.
-- 직원 승인: 직원이 채널에 "직원등록 이름"을 보내면 `quote_bot_users`에 들어감. 승인은 `approved=true`로 바꿈.
-- 콜백 승인 전에는 "결과"라고 보내면 마지막 견적을 받음.
+- 흐름: 카카오 오픈빌더 스킬 → `index.ts`(Gemini로 요청 읽기, 노션 예약 확인) → `core.js`(가격 계산) → `sheet.ts`(Sheets API로 양식 탭 복사·칸 채우기) → 카톡 답장.
+- Supabase 비밀값(jin 직접 입력): `GEMINI_API_KEY`, `NOTION_TOKEN`, `GOOGLE_SA_JSON`(서비스 계정 키). 선택: `QUOTE_SHEET_ID`(기본은 '자동화 복습').
+- 견적 시트는 서비스 계정 이메일에 편집자로 공유해야 함.
+- 가격을 바꿀 때는 `kakao-quote/core.js`의 CFG를 고치고 다시 배포함. `견적자동작성.gs`는 시트 메뉴 버튼용 예전 판이라, 같이 고쳐야 같은 값이 됨.
+- 직원 승인: 채널에 "직원등록 이름" → `quote_bot_users.approved=true`.

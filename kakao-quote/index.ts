@@ -1,7 +1,8 @@
 // 어피어 카톡 채널 견적 챗봇 (Supabase Edge Function "kakao-quote")
 //
 // 카카오 오픈빌더 스킬 → 이 함수 → Gemini(요청 읽기) + 노션(강당·펜션 예약 확인)
-//   → 견적 시트의 Apps Script 웹앱(가격 계산·견적 탭 작성) → 카톡 답장
+//   → 가격 계산(core.js) → 구글 시트에 견적 탭 직접 작성(sheet.ts, Sheets API) → 카톡 답장
+// Apps Script는 쓰지 않는다(콜로그·기관수집의 하루 한도와 무관).
 //
 // 명령 (채널 대화창)
 //   직원등록 이름   : 직원 등록 요청 (승인 전엔 견적 못 씀)
@@ -10,10 +11,14 @@
 // 그 밖의 말은 안내 문구로 답한다. 고객에게 견적을 자동으로 보내지 않는다.
 //
 // 비밀값 (Supabase → Edge Functions → Secrets, jin이 직접 입력)
-//   GEMINI_API_KEY, NOTION_TOKEN, GAS_URL(견적 시트 Apps Script 웹앱 /exec 주소)
-// GAS 호출은 GEMINI_API_KEY로 만든 HMAC 서명(sig)으로 확인한다.
+//   GEMINI_API_KEY, NOTION_TOKEN, GOOGLE_SA_JSON(구글 서비스 계정 키 JSON)
+//   QUOTE_SHEET_ID(선택, 없으면 테스트 시트 '자동화 복습')
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { buildQuote_, assignRooms_, busyFromBookings_, scheduleLine_ } from "./core.js";
+import { writeQuote } from "./sheet.ts";
+
+const DEFAULT_SHEET = "1Ir02b_-zNbLCUkemxEG0yM63DCUJShUwhY0D_RkcDm0"; // 자동화 복습(테스트 시트)
 
 const NOTION_DS = "1cf33639-fc7f-80e9-8abd-000bf8bbb0d0"; // DB_인입콜
 const NOTION_VERSION = "2025-09-03";
@@ -143,55 +148,35 @@ async function notionBookings(checkin: string, checkout: string | null) {
   return out;
 }
 
-// ───────── 견적 시트 Apps Script 웹앱 ─────────
-async function hmac(body: string, key: string) {
-  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(key), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(body)));
-  return btoa(String.fromCharCode(...sig)).replace(/\+/g, "-").replace(/\//g, "_"); // Apps Script base64EncodeWebSafe와 같게
-}
-
-async function callSheet(payload: unknown) {
-  const url = env("GAS_URL");
-  if (!url) throw new Error("GAS_URL 없음");
-  const body = JSON.stringify(payload);
-  const sig = await hmac(body, env("GEMINI_API_KEY"));
-  const r = await fetch(`${url}${url.includes("?") ? "&" : "?"}sig=${encodeURIComponent(sig)}`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body, redirect: "follow",
-  });
-  const txt = await r.text();
-  let j: any;
-  try { j = JSON.parse(txt); } catch { throw new Error(`시트 응답 이상(${r.status}): ${txt.slice(0, 150)}`); }
-  if (!j.ok) throw new Error(`시트: ${j.error}`);
-  return j;
-}
-
 const won = (n: number) => `${Math.round(n).toLocaleString("ko-KR")}원`;
 
-function summary(j: any) {
-  const q = j.q, t = j.t;
+function summary(q: any, t: any, url: string) {
   const lines = [
     `✅ ${q.org} 견적 탭을 만들었어요`,
-    `${q.period} · ${q.dates || "날짜 확인 필요"} · ${q.people}명`,
+    `${q.period} · ${q.checkin ? scheduleLine_(q) : "날짜 확인 필요"} · ${q.people}명`,
     `1인 ${won(q.unit)} · ${q.hall} · 펜션 ${q.pensions.length ? q.pensions.join("·") : "없음"} · 온돌 ${q.ondol}실`,
   ];
-  for (const x of q.extras ?? []) lines.push(`+ ${x.name} ${won(x.amount)}`);
+  for (const x of q.extraHalls ?? []) lines.push(`+ ${x.name} ${won(x.amount)}`);
   lines.push(`총 ${won(t.total)}${q.vat ? " (부가세 포함)" : ""}`);
   lines.push(`계약금 ${won(t.deposit)} / 잔금 ${won(t.balance)}`);
   if (q.flags.length) lines.push("", "확인할 것:", ...q.flags.map((f: string) => `· ${f}`));
-  lines.push("", j.url);
+  lines.push("", url);
   return lines.join("\n");
 }
 
 async function makeQuote(text: string) {
   const req = await parseRequest(text);
+  const q: any = buildQuote_(req);
   let bookings: any[] = [];
-  const notes: string[] = [];
-  if (req.checkin) {
-    try { bookings = await notionBookings(req.checkin, req.checkout); }
-    catch (e) { notes.push(`노션 예약 확인 실패: ${(e as Error).message}`); }
-  } else notes.push("날짜가 확실하지 않아 예약 현황을 못 봤어요");
-  const j = await callSheet({ ts: Date.now(), req, bookings, notes, reqText: text });
-  return { reply: summary(j), result: j };
+  if (q.checkin) {
+    try { bookings = await notionBookings(q.checkin, q.checkout); }
+    catch (e) { q.flags.push(`노션 예약 확인 실패: ${(e as Error).message}`); }
+  } else q.flags.push("날짜가 확실하지 않아 예약 현황을 못 봤어요");
+  assignRooms_(q, busyFromBookings_(bookings));
+  const sa = env("GOOGLE_SA_JSON");
+  if (!sa) throw new Error("GOOGLE_SA_JSON 없음");
+  const w = await writeQuote(q, text, env("QUOTE_SHEET_ID") || DEFAULT_SHEET, sa);
+  return { reply: summary(q, w.totals, w.url), result: { title: w.title, url: w.url, q, t: w.totals } };
 }
 
 // ───────── 작업 실행 (콜백 또는 기록) ─────────
