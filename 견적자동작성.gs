@@ -22,21 +22,23 @@ var CFG = {
   ACC_VAT: '신한 140-015-577115 (주)어피어플레이스',
   // 1인 단가(부가세 별도)
   PRICE: {
-    '당일': { def: 40000 },
-    '1박2일': { church: 70000, group: 75000, company3: 80000, company2: 85000, mt: 49000 },
+    '당일': { bbq: 40000, korean: 30000 }, // jin 10/3: BBQ 무제한 4만~4.7만, 한식 3만~3.7만 (낮은 값 사용)
+    '1박2일': { church: 75000, group: 75000, company3: 80000, company2: 85000, mt: 49000 },
     '2박3일': { offWeekday: 120000, offWeekend: 130000, peak: 150000 }, // 영업방 10/2: 평일 12, 주말 13, 7~8월 패키지 15
     '3박4일': { def: 185000 },
     '4박5일': { def: 260000 }
   },
   KID_DISCOUNT: 20000,
   PENSION_EXTRA: 150000,
+  ROOM_EXTRA: 60000,                                   // 객실 1실 추가(1박) — jin 10/3
+  MAIN_HALL_UPGRADE: 1000000,                          // 4강당 단체가 대강당 원할 때 하루 — jin 10/3, 7~8월 불가
   // 강당: 인원 한도, 추가 대관 하루 요금
   HALLS: [
     { name: '1강당', cap: 20, extra: 300000 },
     { name: '2강당', cap: 60, extra: 500000 },
     { name: '3강당', cap: 60, extra: 500000 },
     { name: '4강당', cap: 130, extra: 800000 },
-    { name: '독립대강당', cap: 300, extra: 800000 } // 추가 대관 요금은 jin 미확정 → 임시 80만
+    { name: '독립대강당', cap: 300, extra: 1000000 }
   ],
   // 기간·종류별 복사할 양식 탭 (앞에서부터 있는 탭 사용)
   TEMPLATES: {
@@ -143,7 +145,7 @@ function parseRequest_(text) {
     'scheduleText(고객이 쓴 일정 원문), customerType(church|company|university|group|agency 중 하나),',
     'bbq(true면 바베큐 원함, false면 원하지 않음/제외, null이면 언급 없음),',
     'twinRoom(2인1실 원하면 true), vatDoc(세금계산서·현금영수증·카드결제 언급 시 true),',
-    'extraHalls(추가로 쓰고 싶다는 강당 이름 배열, 예 ["1강당"]), wantsMainHall(대강당 원하면 true),',
+    'extraHalls(추가로 쓰고 싶다는 강당 이름 배열, 예 ["1강당"]), wantsMainHall(대강당 원하면 true), extraRooms(객실을 몇 실 더 원하는지 숫자, 없으면 0),',
     'notes(그 밖의 요청 한 줄), unsure(확실하지 않은 점 배열, 예: "날짜 후보가 2개").',
     '',
     '견적요청 글:',
@@ -189,7 +191,7 @@ function buildQuote_(r) {
 
   // 단가와 양식
   var unit, tpl, pkgName;
-  if (period === '당일') { unit = CFG.PRICE['당일'].def; tpl = 'TEMPLATES.당일'; pkgName = '당일 패키지'; }
+  if (period === '당일') { unit = r.bbq === false ? CFG.PRICE['당일'].korean : CFG.PRICE['당일'].bbq; tpl = 'TEMPLATES.당일'; pkgName = '당일 패키지'; }
   else if (period === '1박2일') {
     if (type === 'university') { unit = CFG.PRICE['1박2일'].mt; tpl = 'mt'; pkgName = 'MT 패키지'; }
     else if (type === 'company' || type === 'agency') { unit = r.twinRoom ? CFG.PRICE['1박2일'].company2 : CFG.PRICE['1박2일'].company3; tpl = 'company'; pkgName = '바베큐 패키지'; }
@@ -200,7 +202,6 @@ function buildQuote_(r) {
     if (!r.checkin) flags.push('날짜를 몰라 평일 단가 사용');
     tpl = '2박3일'; pkgName = '수련회 패키지';
   } else { unit = CFG.PRICE[period].def; tpl = 'long'; pkgName = '수련회 패키지'; }
-  if ((month === 7 || month === 8) && r.wantsMainHall && people < 150) flags.push('성수기 대강당은 150명 이상만 — 4강당 안내할지 확인');
   if (people >= 250) flags.push('대형 단체 특가(11.5~12만)는 대표 방침상 전화로만 — 견적가 확인');
   if (period !== '1박2일' && r.twinRoom) flags.push('2인1실 요청: 1인당 +10,000 선택사항으로 안내 필요');
 
@@ -215,13 +216,13 @@ function buildQuote_(r) {
     adults: adults, kids: kids, people: people, period: period, nights: nights, days: days,
     checkin: r.checkin || null, checkout: r.checkout || null, scheduleText: r.scheduleText || '',
     type: type, unit: unit, tplKey: tpl, pkgName: pkgName, bbq: bbq, vat: vat,
-    twin: !!r.twinRoom, wantsMainHall: !!r.wantsMainHall, extraHallsWanted: r.extraHalls || [],
+    twin: !!r.twinRoom, wantsMainHall: !!r.wantsMainHall, extraHallsWanted: r.extraHalls || [], extraRooms: Number(r.extraRooms) || 0, month: month,
     notes: r.notes || '', flags: flags, lines: [], extras: []
   };
 }
 
 function smallestHallFor_(people, wantsMain) {
-  if (wantsMain) return '독립대강당';
+  if (wantsMain && people > 130) return '독립대강당';
   for (var i = 0; i < CFG.HALLS.length; i++) if (people <= CFG.HALLS[i].cap) return CFG.HALLS[i].name;
   return null;
 }
@@ -240,17 +241,25 @@ function assignRooms_(q, busy) {
   else if (hall !== want) q.flags.push(want + '이(가) 예약돼 있어 ' + hall + '(으)로 배정');
   q.hall = hall;
 
-  // 추가 강당
+  // 추가 강당 (4강당 이하 단체가 대강당 원하면 추가 대관으로)
   q.extraHalls = [];
-  q.extraHallsWanted.forEach(function (n) {
+  var wanted = q.extraHallsWanted.slice();
+  if (q.wantsMainHall && hall !== '독립대강당') wanted.push('독립대강당');
+  var seen = {};
+  wanted.forEach(function (n) {
     var name = String(n).replace(/\s/g, '').replace(/^대강당$/, '독립대강당');
     var h = hallInfo_(name);
     if (!h) { q.flags.push('추가 강당 "' + n + '"을(를) 못 알아봄'); return; }
-    if (name === hall) return;
+    if (name === hall || seen[name]) return; seen[name] = 1;
+    if (name === '독립대강당' && (q.month === 7 || q.month === 8)) { q.flags.push('여름(7~8월)엔 작은 단체 대강당 대관 불가 — 대강당 줄 넣지 않음'); return; }
+    if (name === '독립대강당' && (q.month === 12 || q.month === 1 || q.month === 2)) q.flags.push('겨울 대강당 대관은 jin 결정 대기 — 하루 100만으로 적음, 진행 여부 확인');
     if (busy.halls[name]) q.flags.push('추가 요청한 ' + name + '은(는) 그날 예약 있음');
-    if (name === '독립대강당') q.flags.push('대강당 추가 대관료는 임시값(하루 80만)');
-    q.extraHalls.push({ name: name, day: h.extra, days: q.days, amount: h.extra * q.days });
+    q.extraHalls.push({ name: name + ' (추가)', label: '추가 대관 ' + q.days + '일 (하루 ' + h.extra.toLocaleString() + '원)', day: h.extra, qty: q.days, amount: h.extra * q.days });
   });
+  if (q.extraRooms && q.nights > 0) {
+    var rq = q.extraRooms * q.nights;
+    q.extraHalls.push({ name: '객실 추가', label: q.extraRooms + '실 × ' + q.nights + '박 (1실 ' + CFG.ROOM_EXTRA.toLocaleString() + '원)', day: CFG.ROOM_EXTRA, qty: rq, amount: CFG.ROOM_EXTRA * rq });
+  }
 
   // 펜션동
   var need = q.people <= 20 ? 0 : q.people <= 40 ? 1 : q.people <= 70 ? 2 : 3;
@@ -436,9 +445,9 @@ function fillSheet_(sh, q, reqText) {
     sh.insertRowAfter(hallRow.row);
     var nr = hallRow.row + 1;
     sh.getRange(hallRow.row, 1, 1, 11).copyTo(sh.getRange(nr, 1, 1, 11), { formatOnly: true });
-    setC(nr, '서비스종류', h.name + ' (추가)');
-    setC(nr, '내용', '추가 대관 ' + h.days + '일 (하루 ' + h.day.toLocaleString() + '원)');
-    setC(nr, '수량', h.days); setC(nr, '단가', h.day);
+    setC(nr, '서비스종류', h.name);
+    setC(nr, '내용', h.label);
+    setC(nr, '수량', h.qty); setC(nr, '단가', h.day);
     setC(nr, '세액', q.vat ? Math.round(h.day * 0.1) : 0);
     setSum(nr, q.vat ? Math.round(h.amount * 1.1) : h.amount);
   });
