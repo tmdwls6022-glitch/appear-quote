@@ -22,7 +22,7 @@ var CFG = {
   ACC_VAT: '신한 140-015-577115 (주)어피어플레이스',
   // 1인 단가(부가세 별도)
   PRICE: {
-    '당일': { bbq: 40000, korean: 30000 }, // jin 10/3: BBQ 무제한 4만~4.7만, 한식 3만~3.7만 (낮은 값 사용)
+    '당일': { bbq: 40000, korean: 30000, bbqHigh: 47000, koreanHigh: 37000 }, // jin 10/3: 금·토·일과 7~8월은 높은 값
     '1박2일': { church: 75000, group: 75000, company3: 80000, company2: 85000, mt: 49000 },
     '2박3일': { offWeekday: 120000, offWeekend: 130000, peak: 150000 }, // 영업방 10/2: 평일 12, 주말 13, 7~8월 패키지 15
     '3박4일': { def: 185000 },
@@ -191,7 +191,11 @@ function buildQuote_(r) {
 
   // 단가와 양식
   var unit, tpl, pkgName;
-  if (period === '당일') { unit = r.bbq === false ? CFG.PRICE['당일'].korean : CFG.PRICE['당일'].bbq; tpl = 'TEMPLATES.당일'; pkgName = '당일 패키지'; }
+  if (period === '당일') {
+    var dw = r.checkin ? new Date(r.checkin + 'T00:00:00').getDay() : -1;
+    var high = month === 7 || month === 8 || dw === 5 || dw === 6 || dw === 0;
+    var dp = CFG.PRICE['당일'];
+    unit = r.bbq === false ? (high ? dp.koreanHigh : dp.korean) : (high ? dp.bbqHigh : dp.bbq); tpl = 'TEMPLATES.당일'; pkgName = '당일 패키지'; }
   else if (period === '1박2일') {
     if (type === 'university') { unit = CFG.PRICE['1박2일'].mt; tpl = 'mt'; pkgName = 'MT 패키지'; }
     else if (type === 'company' || type === 'agency') { unit = r.twinRoom ? CFG.PRICE['1박2일'].company2 : CFG.PRICE['1박2일'].company3; tpl = 'company'; pkgName = '바베큐 패키지'; }
