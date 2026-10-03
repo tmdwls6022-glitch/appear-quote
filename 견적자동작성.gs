@@ -30,6 +30,8 @@ var CFG = {
   },
   KID_DISCOUNT: 20000,
   PENSION_EXTRA: 150000,
+  TWIN_PER_NIGHT: 10000,                               // 2인1실 1인 1박당 추가 — jin 10/3
+  MEAL_DROP: 10000,                                    // 식사 1끼 빼면 1인 −1만, 7~8월 불가 — jin 10/3
   ROOM_EXTRA: 60000,                                   // 객실 1실 추가(1박) — jin 10/3
   MAIN_HALL_UPGRADE: 1000000,                          // 4강당 단체가 대강당 원할 때 하루 — jin 10/3, 7~8월 불가
   // 강당: 인원 한도, 추가 대관 하루 요금
@@ -145,7 +147,7 @@ function parseRequest_(text) {
     'scheduleText(고객이 쓴 일정 원문), customerType(church|company|university|group|agency 중 하나),',
     'bbq(true면 바베큐 원함, false면 원하지 않음/제외, null이면 언급 없음),',
     'twinRoom(2인1실 원하면 true), vatDoc(세금계산서·현금영수증·카드결제 언급 시 true),',
-    'extraHalls(추가로 쓰고 싶다는 강당 이름 배열, 예 ["1강당"]), wantsMainHall(대강당 원하면 true), extraRooms(객실을 몇 실 더 원하는지 숫자, 없으면 0),',
+    'extraHalls(추가로 쓰고 싶다는 강당 이름 배열, 예 ["1강당"]), wantsMainHall(대강당 원하면 true), extraRooms(객실을 몇 실 더 원하는지 숫자, 없으면 0), skipMeals(기본 패키지에서 빼 달라는 식사 끼니 수, 없으면 0),',
     'notes(그 밖의 요청 한 줄), unsure(확실하지 않은 점 배열, 예: "날짜 후보가 2개").',
     '',
     '견적요청 글:',
@@ -207,7 +209,12 @@ function buildQuote_(r) {
     tpl = '2박3일'; pkgName = '수련회 패키지';
   } else { unit = CFG.PRICE[period].def; tpl = 'long'; pkgName = '수련회 패키지'; }
   if (people >= 250) flags.push('대형 단체 특가(11.5~12만)는 대표 방침상 전화로만 — 견적가 확인');
-  if (period !== '1박2일' && r.twinRoom) flags.push('2인1실 요청: 1인당 +10,000 선택사항으로 안내 필요');
+  if (nights >= 2 && r.twinRoom) unit += CFG.TWIN_PER_NIGHT * nights;   // 2인1실: 1박당 +1만
+  var skip = Number(r.skipMeals) || 0;
+  if (skip > 0 && period !== '당일') {
+    if (month === 7 || month === 8) flags.push('7~8월은 식사를 뺄 수 없음 — 고객이 ' + skip + '끼 빼 달라고 함');
+    else { unit -= CFG.MEAL_DROP * skip; flags.push('식사 ' + skip + '끼 빼고 1인 ' + (CFG.MEAL_DROP * skip).toLocaleString() + '원 깎음 — 식사 문구(총 몇 식)는 직접 고쳐 주세요'); }
+  }
 
   var bbq = r.bbq !== false; // 언급 없으면 기본 포함
   if (period === '1박2일' && type === 'university') bbq = true;
@@ -220,7 +227,7 @@ function buildQuote_(r) {
     adults: adults, kids: kids, people: people, period: period, nights: nights, days: days,
     checkin: r.checkin || null, checkout: r.checkout || null, scheduleText: r.scheduleText || '',
     type: type, unit: unit, tplKey: tpl, pkgName: pkgName, bbq: bbq, vat: vat,
-    twin: !!r.twinRoom, wantsMainHall: !!r.wantsMainHall, extraHallsWanted: r.extraHalls || [], extraRooms: Number(r.extraRooms) || 0, month: month,
+    twin: !!r.twinRoom, wantsMainHall: !!r.wantsMainHall, extraHallsWanted: r.extraHalls || [], extraRooms: Number(r.extraRooms) || 0, skipMeals: Number(r.skipMeals) || 0, month: month,
     notes: r.notes || '', flags: flags, lines: [], extras: []
   };
 }
