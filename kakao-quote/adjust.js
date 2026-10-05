@@ -81,7 +81,7 @@ function applyAdjust_(req, set) {
   return r;
 }
 
-// 조정표에서 읽은 값 중 실제로 바뀐 것만 (빈칸·같은 값은 뺌)
+// 조정표에서 읽은 값 중 실제로 바뀐 것만 (빈칸·같은 값은 제외)
 function diff_(req, set) {
   const cur = Object.fromEntries(ROWS.map(([, k, get, parse]) => [k, parse(get(req))]));
   return Object.fromEntries(Object.entries(set).filter(([k, v]) => JSON.stringify(v ?? null) !== JSON.stringify(cur[k] ?? null)));

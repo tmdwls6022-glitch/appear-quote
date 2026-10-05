@@ -293,7 +293,7 @@ export async function readAdjust(sheetId: string, gid: number, saJson: string) {
   const token = await googleToken(saJson);
   const meta = await gapi(token, "GET", `${API}/${sheetId}?fields=sheets.properties(sheetId,title)`);
   const tab = meta.sheets.map((s: any) => s.properties).find((p: any) => p.sheetId === gid);
-  if (!tab) throw new Error("견적 탭을 못 찾음(지워졌거나 이름이 바뀜) — 수정: 명령으로 고쳐 주세요");
+  if (!tab) throw new Error("견적 탭을 못 찾음(탭이 지워졌거나 이름 변경) — 수정: 명령으로 고쳐 주세요");
   const range = encodeURIComponent(`${q1(tab.title)}!N${ADJ_ROW + 2}:N${ADJ_ROW + 14}`);
   const j = await gapi(token, "GET", `${API}/${sheetId}/values/${range}`);
   const vals = (j.values ?? []).map((r: any[]) => r[0] ?? "");
