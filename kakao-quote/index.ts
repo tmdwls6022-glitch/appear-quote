@@ -8,7 +8,7 @@
 //   직원등록 이름   : 직원 등록 요청 (승인 전엔 견적 못 씀)
 //   견적: <요청 글>  : 견적서 작성
 //   결과            : 가장 최근 견적 결과 다시 보기 (콜백 승인 전용)
-//   모의 / 모의 새로 / 모의결과 : 카톡방 요청글로 읽기 정확도 시험 (mock.ts, 시트에 안 씀)
+//   모의 / 모의 새로 [v1] / 모의결과 : 카톡방 요청글로 읽기 정확도 시험 (mock.ts, 시트에 안 씀)
 // 답장 아래 버튼 [PDF] [사진] [시트] — 누르면 그때 견적서 부분(A~K열)만 PDF·PNG로 만든다(jin 10/5).
 //   링크: GET ?f=pdf|png&j=작업번호&k=비밀값. 시트에서 고친 내용도 누를 때 반영된다.
 // 그 밖의 말은 안내 문구로 답한다. 고객에게 견적을 자동으로 보내지 않는다.
@@ -89,8 +89,23 @@ function today() {
   return new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10); // KST
 }
 
-// asof: 요청을 받은 날(모의 견적용). 없으면 오늘.
-async function parseRequest(text: string, asof?: string) {
+// 읽기 규칙 v2 — jin 10/5: 카톡 견적방 175건 모의 견적에서 자주 틀린 것 ("모의 새로 v1"이면 이 규칙 없이 읽어 비교)
+const RULES = [
+  "규칙:",
+  "- 인원: adults 는 초등학생보다 큰 사람 전부(중·고등학생, 청소년, 청년, 교사, 어른). kids 는 미취학·초등학생(어린이, 아동, 유아, 1~6학년)만. 예: '중고등 60/성인 20' → adults 80, kids 0. '초등 70, 성인 26' → adults 26, kids 70.",
+  "- 인원이 범위(30~40명, 5~60명)면 큰 값. 총원이 따로 적혀 있으면 총원에 맞춘다.",
+  "- 날짜 후보가 여럿(1안/2안, 또는, or, 혹은)이면 첫 번째 후보를 checkin·checkout 에 넣고 unsure 에 \"날짜 후보 N개\"를 적는다.",
+  "- 날(일)이 없고 '1월 중순', '7월말 목금토', '11월 초 평일'처럼 대략이면 checkin·checkout 은 null, nights 는 글의 박 수, unsure 에 적는다.",
+  "- '27년', '27.8.13' 은 2027년. 연도가 없으면 오늘 이후 가장 가까운 날짜. 날짜 차이와 'N박'이 서로 안 맞으면 unsure 에 적는다.",
+  "- nights 는 checkout - checkin 일수. 당일(숙박 없음)이면 0.",
+  "- customerType: 교회·성당·청년부·중고등부 → church / 대학교·대학원·학과·학부·동아리 → university / 회사·(주)·기업 워크숍·관공서·구청·복지관·협회·재단·센터·노동조합 → company / 여행사·투어 → agency / 가족·친구·동창·동문·향우회·개인 모임 → group.",
+  "- bbq: 바베큐·바비큐·BBQ 를 원하면 true, '바베큐 말고'처럼 빼 달라면 false, 말이 없으면 null.",
+  "- wantsMainHall: '대강당'을 콕 집어 원할 때만 true. '강당 필요'만으로는 false.",
+  "- twinRoom: '2인1실'을 원할 때만 true. vatDoc: 세금계산서·부가세 포함·카드결제를 말할 때만 true.",
+];
+
+// asof: 요청을 받은 날(모의 견적용). 없으면 오늘. variant "v1": 규칙 없이(비교용)
+async function parseRequest(text: string, asof?: string, variant?: string) {
   const key = env("GEMINI_API_KEY");
   if (!key) throw new Error("GEMINI_API_KEY 없음");
   const prompt = [
@@ -104,6 +119,7 @@ async function parseRequest(text: string, asof?: string) {
     "twinRoom(2인1실 원하면 true), vatDoc(세금계산서·현금영수증·카드결제 언급 시 true),",
     'extraHalls(추가로 쓰고 싶다는 강당 이름 배열, 예 ["1강당"]), wantsMainHall(대강당 원하면 true), extraRooms(객실을 몇 실 더 원하는지 숫자, 없으면 0), skipMeals(기본 패키지에서 빼 달라는 식사 끼니 수, 없으면 0),',
     'notes(그 밖의 요청 한 줄), unsure(확실하지 않은 점 배열, 예: "날짜 후보가 2개").',
+    ...(variant === "v1" ? [] : ["", ...RULES]),
     "",
     "견적요청 글:",
     text,
@@ -284,7 +300,7 @@ Deno.serve(async (req) => {
 
   const m = utter.match(/^견적\s*[:：]?\s*([\s\S]+)$/);
   const isResult = /^결과$/.test(utter);
-  const mock = utter.match(/^모의\s*(새로|결과)?$/);
+  const mock = utter.match(/^모의\s*(새로|결과)?\s*(v1)?$/i);
   if (!m && !isResult && !mock) return json(kakaoText(HELP));
 
   const { data: u } = await sb.from("quote_bot_users").select("approved").eq("user_key", userKey).maybeSingle();
@@ -300,10 +316,10 @@ Deno.serve(async (req) => {
 
   if (mock) {
     if (mock[1] === "결과") return json(kakaoText(await mockSummary(sb)));
-    const s = await startMock(sb, mock[1] === "새로");
+    const s = await startMock(sb, mock[1] === "새로", (mock[2] ?? "").toLowerCase() || "v2");
     if (!s.picked.length) return json(kakaoText("모의 사례가 없거나 지금 돌리는 중이에요. '모의결과'로 확인해 주세요."));
     // @ts-ignore EdgeRuntime는 Supabase 런타임 전역
-    EdgeRuntime.waitUntil(runMock(sb, parseRequest, s.runId, s.picked));
+    EdgeRuntime.waitUntil(runMock(sb, (t: string, a?: string) => parseRequest(t, a, s.variant), s.runId, s.picked));
     return json(kakaoText(`모의 견적 ${s.runId}: ${s.done + 1}~${s.done + s.picked.length}번째 (전체 ${s.total}) 돌리는 중이에요. 1분쯤 뒤 '모의결과'를 보내 주세요.`));
   }
 

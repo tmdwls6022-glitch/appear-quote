@@ -1,7 +1,7 @@
 // 모의 견적 (jin 10/5) — 카톡 견적방 요청글(quote_test_cases)을 Gemini 로 읽혀 정답과 비교한다.
 // 시트에 쓰지 않고 노션도 보지 않는다. 결과는 quote_test_runs 에만 남긴다.
 //   "모의"     : 진행 중인 회차의 남은 사례를 한 번에 BATCH 건씩 돌림 (다 끝났으면 새 회차 시작)
-//   "모의 새로" : 새 회차 시작
+//   "모의 새로" : 새 회차 시작 ("모의 새로 v1" 이면 읽기 규칙 없는 예전 방식으로 — 비교용)
 //   "모의결과"  : 최근 회차 점수와 틀린 사례
 
 import { buildQuote_ } from "./core.js";
@@ -18,10 +18,10 @@ async function latestRun(sb: any) {
 }
 
 // 이번에 돌릴 사례를 골라 running 으로 먼저 박아 둔다(겹쳐 호출돼도 같은 사례를 두 번 돌리지 않게).
-export async function startMock(sb: any, fresh: boolean) {
+export async function startMock(sb: any, fresh: boolean, variant = "v2") {
   const { data: cases } = await sb.from("quote_test_cases").select("id").eq("active", true).order("id");
   const all = (cases ?? []).map((c: any) => c.id as string);
-  if (!all.length) return { runId: "", picked: [] as string[], total: 0, done: 0 };
+  if (!all.length) return { runId: "", picked: [] as string[], total: 0, done: 0, variant };
   let runId = fresh ? undefined : await latestRun(sb);
   let doneIds: string[] = [];
   if (runId) {
@@ -29,10 +29,11 @@ export async function startMock(sb: any, fresh: boolean) {
     doneIds = (data ?? []).map((r: any) => r.case_id);
     if (all.every((id: string) => doneIds.includes(id))) runId = undefined; // 다 끝난 회차 → 새로
   }
-  if (!runId) { runId = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 16).replace("T", " "); doneIds = []; }
+  if (!runId) { runId = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 16).replace("T", " ") + " " + variant; doneIds = []; }
+  variant = runId.split(" ").pop() === "v1" ? "v1" : "v2"; // 이어서 돌릴 땐 그 회차 방식대로
   const picked = all.filter((id: string) => !doneIds.includes(id)).slice(0, BATCH);
   if (picked.length) await sb.from("quote_test_runs").insert(picked.map((id: string) => ({ run_id: runId, case_id: id, status: "running" })));
-  return { runId, picked, total: all.length, done: doneIds.length };
+  return { runId, picked, total: all.length, done: doneIds.length, variant };
 }
 
 export async function runMock(sb: any, parse: Parse, runId: string, ids: string[]) {
