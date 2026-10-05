@@ -131,7 +131,12 @@ async function notionBookings(checkin: string, checkout: string | null) {
       headers: { Authorization: `Bearer ${token}`, "Notion-Version": NOTION_VERSION, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!r.ok) throw new Error(`노션 ${r.status}: ${(await r.text()).slice(0, 200)}`);
+    if (!r.ok) {
+      console.error("notion", r.status, (await r.text()).slice(0, 300));
+      const why = r.status === 404 ? "통합이 DB_인입콜에 연결 안 됨"
+        : r.status === 401 ? "노션 키가 맞지 않음" : `오류 ${r.status}`;
+      throw new Error(`${why} → 강당·펜션 겹침은 직접 확인`);
+    }
     const j = await r.json();
     for (const pg of j.results) {
       const p = pg.properties;
