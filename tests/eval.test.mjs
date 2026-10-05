@@ -24,4 +24,8 @@ assert.deepEqual(s.miss.map((m) => m.field), ["unsure"]);
 s = scoreCase_({ ci: null, n: 2 }, { checkin: "2027-01-15", checkout: "2027-01-17", adults: 40 });
 assert.deepEqual(s.miss.map((m) => m.field), ["ci"]);
 
+// 6. 단가는 같아도 부가세(회사)가 갈리면 금액 틀림
+s = scoreCase_({ n: 2, t: "company" }, { checkin: "2026-11-11", nights: 2, adults: 40, customerType: "group" });
+assert.equal(s.unitBot, s.unitGold); assert.equal(s.unitOk, false);
+
 console.log("eval.test 통과");

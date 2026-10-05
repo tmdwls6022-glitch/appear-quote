@@ -98,6 +98,7 @@ const RULES = [
   "- 날(일)이 없고 '1월 중순', '7월말 목금토', '11월 초 평일'처럼 대략이면 checkin·checkout 은 null, nights 는 글의 박 수, unsure 에 적는다.",
   "- '27년', '27.8.13' 은 2027년. 연도가 없으면 오늘 이후 가장 가까운 날짜. 날짜 차이와 'N박'이 서로 안 맞으면 unsure 에 적는다.",
   "- nights 는 checkout - checkin 일수. 당일(숙박 없음)이면 0.",
+  "- '견적요청날짜', '요청일', '신청 시간'은 글을 쓴 날이지 이용 날짜가 아니다. 이용 날짜가 없으면 checkin 은 null.",
   "- customerType: 교회·성당·청년부·중고등부 → church / 대학교·대학원·학과·학부·동아리 → university / 회사·(주)·기업 워크숍·관공서·구청·복지관·협회·재단·센터·노동조합 → company / 여행사·투어 → agency / 가족·친구·동창·동문·향우회·개인 모임 → group.",
   "- bbq: 바베큐·바비큐·BBQ 를 원하면 true, '바베큐 말고'처럼 빼 달라면 false, 말이 없으면 null.",
   "- wantsMainHall: '대강당'을 콕 집어 원할 때만 true. '강당 필요'만으로는 false.",
@@ -319,8 +320,14 @@ Deno.serve(async (req) => {
     const s = await startMock(sb, mock[1] === "새로", (mock[2] ?? "").toLowerCase() || "v2");
     if (!s.picked.length) return json(kakaoText("모의 사례가 없거나 지금 돌리는 중이에요. '모의결과'로 확인해 주세요."));
     // @ts-ignore EdgeRuntime는 Supabase 런타임 전역
-    EdgeRuntime.waitUntil(runMock(sb, (t: string, a?: string) => parseRequest(t, a, s.variant), s.runId, s.picked));
-    return json(kakaoText(`모의 견적 ${s.runId}: ${s.done + 1}~${s.done + s.picked.length}번째 (전체 ${s.total}) 돌리는 중이에요. 1분쯤 뒤 '모의결과'를 보내 주세요.`));
+    EdgeRuntime.waitUntil(runMock(sb, (t: string, a?: string) => parseRequest(t, a, s.variant), s.runId, s.picked)
+      .then(async () => {
+        // jin 10/5: 남은 사례가 있으면 스스로 "모의"를 한 번 더 보내 175건 끝까지 이어 돌림
+        const { count } = await sb.from("quote_test_runs").select("id", { count: "exact", head: true }).eq("run_id", s.runId);
+        if ((count ?? 0) < s.total) await fetch(`${env("SUPABASE_URL")}/functions/v1/kakao-quote`, { method: "POST",
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userRequest: { user: { id: userKey }, utterance: "모의" } }) });
+      }));
+    return json(kakaoText(`모의 견적 ${s.runId}: ${s.done + 1}~${s.done + s.picked.length}번째 (전체 ${s.total}) 돌리는 중이에요. 끝까지 알아서 이어 돌려요(전체 5분쯤). '모의결과'로 확인하세요.`));
   }
 
   const text = m![1].trim();

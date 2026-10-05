@@ -52,9 +52,10 @@ function scoreCase_(e, parsed) {
   if (e.unsure && !(parsed.unsure || []).length) add("unsure", "후보 여럿·애매함 표시", "표시 없음");
 
   // 단가: 정답으로 계산한 값과 Gemini 값으로 계산한 값
-  const unitBot = buildQuote_(parsed).unit;
-  const unitGold = buildQuote_(goldRequest_(e, parsed)).unit;
-  return { ok: miss.length === 0, unitOk: unitBot === unitGold, unitBot, unitGold, miss, got };
+  // jin 10/5: 부가세 포함 여부(회사·여행사는 부가세 포함)도 금액이 10% 달라지니 같이 본다
+  const qb = buildQuote_(parsed), qg = buildQuote_(goldRequest_(e, parsed));
+  return { ok: miss.length === 0, unitOk: qb.unit === qg.unit && qb.vat === qg.vat,
+    unitBot: qb.unit, unitGold: qg.unit, vatBot: qb.vat, vatGold: qg.vat, miss, got };
 }
 
 export { scoreCase_, goldRequest_, inRange };
