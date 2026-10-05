@@ -22,6 +22,13 @@ export const CFG = {
   MEAL_DROP: 10000,                                    // 식사 1끼 빼면 1인 −1만, 7~8월 불가 — jin 10/3
   ROOM_EXTRA: 60000,                                   // 객실 1실 추가(1박) — jin 10/3
   MAIN_HALL_UPGRADE: 1000000,                          // 4강당 단체가 대강당 원할 때 하루 — jin 10/3, 7~8월 불가
+  // 견적서 PDF·사진 내보내기 — jin 10/5: 배율은 나중에 실제 화면 보고 조정
+  EXPORT: {
+    size: 'A4', portrait: true,
+    scale: 4,        // 구글 배율: 1=100%, 2=너비 맞춤, 3=높이 맞춤, 4=한 쪽에 맞춤
+    margin: 0.4,     // 여백(인치)
+    pngScale: 2      // 사진 해상도: PDF 1pt 당 픽셀 (2 ≈ 144dpi, A4 폭 약 1190px)
+  },
   // 강당: 인원 한도, 추가 대관 하루 요금
   HALLS: [
     { name: '1강당', cap: 20, extra: 300000 },

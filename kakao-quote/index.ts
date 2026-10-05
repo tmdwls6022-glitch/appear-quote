@@ -8,6 +8,8 @@
 //   직원등록 이름   : 직원 등록 요청 (승인 전엔 견적 못 씀)
 //   견적: <요청 글>  : 견적서 작성
 //   결과            : 가장 최근 견적 결과 다시 보기 (콜백 승인 전용)
+// 답장 아래 버튼 [PDF] [사진] [시트] — 누르면 그때 견적서 부분(A~K열)만 PDF·PNG로 만든다(jin 10/5).
+//   링크: GET ?f=pdf|png&j=작업번호&k=비밀값. 시트에서 고친 내용도 누를 때 반영된다.
 // 그 밖의 말은 안내 문구로 답한다. 고객에게 견적을 자동으로 보내지 않는다.
 //
 // 비밀값 (Supabase → Edge Functions → Secrets, jin이 직접 입력)
@@ -16,7 +18,9 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { buildQuote_, assignRooms_, busyFromBookings_, scheduleLine_ } from "./core.js";
-import { writeQuote } from "./sheet.ts";
+import { CFG } from "./core.js";
+import { writeQuote, exportPdf } from "./sheet.ts";
+import { pdfToPng } from "./image.ts";
 
 const DEFAULT_SHEET = "1Ir02b_-zNbLCUkemxEG0yM63DCUJShUwhY0D_RkcDm0"; // 자동화 복습(테스트 시트)
 
@@ -33,6 +37,23 @@ function kakaoText(text: string) {
 }
 function json(obj: unknown) {
   return new Response(JSON.stringify(obj), { headers: { "Content-Type": "application/json; charset=utf-8" } });
+}
+// 요약 글 + 파일 버튼 카드
+function fileLink(f: string, jobId: number, k: string) {
+  return `${env("SUPABASE_URL")}/functions/v1/kakao-quote?f=${f}&j=${jobId}&k=${k}`;
+}
+function kakaoQuote(text: string, jobId: number | null, res: any) {
+  const outputs: any[] = [{ simpleText: { text: text.slice(0, 990) } }];
+  if (jobId && res?.share) outputs.push({ textCard: {
+    title: "견적서 파일",
+    description: "누르면 견적서 부분만 PDF·사진으로 열려요.\n시트에서 고친 내용도 반영돼요.",
+    buttons: [
+      { action: "webLink", label: "PDF", webLinkUrl: fileLink("pdf", jobId, res.share) },
+      { action: "webLink", label: "사진", webLinkUrl: fileLink("png", jobId, res.share) },
+      { action: "webLink", label: "시트 열기", webLinkUrl: res.url },
+    ],
+  } });
+  return { version: "2.0", template: { outputs } };
 }
 
 const HELP = [
@@ -181,7 +202,8 @@ async function makeQuote(text: string) {
   const sa = env("GOOGLE_SA_JSON");
   if (!sa) throw new Error("GOOGLE_SA_JSON 없음");
   const w = await writeQuote(q, text, env("QUOTE_SHEET_ID") || DEFAULT_SHEET, sa);
-  return { reply: summary(q, w.totals, w.url), result: { title: w.title, url: w.url, q, t: w.totals } };
+  return { reply: summary(q, w.totals, w.url), result: { title: w.title, url: w.url, q, t: w.totals,
+    sheetId: w.sheetId, gid: w.gid, range: w.range, share: crypto.randomUUID().replace(/-/g, "") } };
 }
 
 // ───────── 작업 실행 (콜백 또는 기록) ─────────
@@ -193,13 +215,44 @@ async function runJob(userKey: string, text: string, callbackUrl: string | null)
   catch (e) { status = "error"; reply = `⚠️ 견적을 못 만들었어요: ${(e as Error).message}`; }
   if (job) await sb.from("quote_bot_jobs").update({ status, reply, result, finished_at: new Date().toISOString() }).eq("id", job.id);
   if (callbackUrl) {
-    await fetch(callbackUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(kakaoText(reply)) })
+    await fetch(callbackUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(kakaoQuote(reply, job?.id ?? null, result)) })
       .catch(() => {});
+  }
+}
+
+// ───────── PDF·사진 버튼 ─────────
+function fileError(msg: string, status = 400) {
+  return new Response(msg, { status, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+}
+async function serveFile(u: URL) {
+  const f = u.searchParams.get("f"), j = Number(u.searchParams.get("j")), k = u.searchParams.get("k") ?? "";
+  if ((f !== "pdf" && f !== "png") || !j || !k) return fileError("잘못된 링크예요.");
+  const { data: job } = await db().from("quote_bot_jobs").select("result").eq("id", j).maybeSingle();
+  const r: any = job?.result;
+  if (!r?.share || r.share !== k) return fileError("링크가 맞지 않아요.", 404);
+  try {
+    const pdf = await exportPdf(r.sheetId, r.gid, r.range, env("GOOGLE_SA_JSON"));
+    const body = f === "pdf" ? pdf : await pdfToPng(pdf, CFG.EXPORT.pngScale);
+    // 파일 이름 한글은 RFC 5987 방식으로 (깨짐 방지), 영문 이름도 같이
+    const name = `견적서_${r.title}.${f}`;
+    return new Response(body, { headers: {
+      "Content-Type": f === "pdf" ? "application/pdf" : "image/png",
+      "Content-Disposition": `inline; filename="quote_${j}.${f}"; filename*=UTF-8''${encodeURIComponent(name)}`,
+      "Cache-Control": "private, no-store",
+    } });
+  } catch (e) {
+    console.error("file", f, j, (e as Error).message);
+    return fileError(`${f === "pdf" ? "PDF" : "사진"}를 못 만들었어요: ${(e as Error).message}`, 500);
   }
 }
 
 // ───────── 진입점 ─────────
 Deno.serve(async (req) => {
+  if (req.method === "GET") {
+    const u = new URL(req.url);
+    if (u.searchParams.has("f")) return serveFile(u);
+    return new Response("ok");
+  }
   if (req.method !== "POST") return new Response("ok");
   let body: any;
   try { body = await req.json(); } catch { return json(kakaoText(HELP)); }
@@ -223,11 +276,11 @@ Deno.serve(async (req) => {
   if (!u?.approved) return json(kakaoText('직원용 기능이에요. 처음이면 "직원등록 이름"을 보내 주세요.'));
 
   if (isResult) {
-    const { data: last } = await sb.from("quote_bot_jobs").select("status, reply").eq("user_key", userKey)
+    const { data: last } = await sb.from("quote_bot_jobs").select("id, status, reply, result").eq("user_key", userKey)
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
     if (!last) return json(kakaoText("아직 만든 견적이 없어요."));
     if (last.status === "running") return json(kakaoText("아직 만드는 중이에요. 잠시 뒤 다시 '결과'를 보내 주세요."));
-    return json(kakaoText(last.reply ?? ""));
+    return json(kakaoQuote(last.reply ?? "", last.id, last.result));
   }
 
   const text = m![1].trim();
