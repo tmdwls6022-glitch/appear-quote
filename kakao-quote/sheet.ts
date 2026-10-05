@@ -3,6 +3,7 @@
 // 비밀값: GOOGLE_SA_JSON (서비스 계정 키 JSON 전체). 견적 시트를 그 계정 이메일에 편집자로 공유해야 한다.
 
 import { CFG, priceTotals_, periodLabel_, scheduleLine_, pensionText_ } from "./core.js";
+import { adjustTable_, fromTable_, ADJ_ROW, ADJ_COL } from "./adjust.js";
 
 const API = "https://sheets.googleapis.com/v4/spreadsheets";
 
@@ -83,7 +84,8 @@ function rightOf(g: Grid, cell: { row: number; col: number }) {
 }
 
 // ───────── 본체 ─────────
-export async function writeQuote(q: any, reqText: string, sheetId: string, saJson: string) {
+// req: Gemini 가 읽은 요청(조정표에 씀). replaceGid: 수정으로 다시 만들 때 지울 예전 탭
+export async function writeQuote(q: any, reqText: string, sheetId: string, saJson: string, req: any = null, replaceGid: number | null = null) {
   const token = await googleToken(saJson);
 
   // 1. 양식 탭 복사 → 단체명 이름으로 맨 앞에
@@ -235,6 +237,12 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
   put(2, 12, memo.join("\n"));
   marks.push({ row: 2, col: 12, note: "", color: q.flags.length ? "#fff59d" : "#e8f5e9", wrap: true });
 
+  // 조정표(M8~N21) — jin 10/5: N열을 고치고 카톡에 "다시"를 보내면 그 값으로 다시 계산
+  if (req) adjustTable_(req).forEach(([label, v], i) => {
+    put(ADJ_ROW + i, ADJ_COL, label); put(ADJ_ROW + i, ADJ_COL + 1, v);
+    if (i > 0) marks.push({ row: ADJ_ROW + i, col: ADJ_COL + 1, note: "", color: "#fff8e1" });
+  });
+
   // 4. 한 번에 쓰기
   await gapi(token, "POST", `${API}/${sheetId}/values:batchUpdate`, {
     valueInputOption: "USER_ENTERED",
@@ -252,6 +260,11 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
   g.vals.forEach((row, r) => { if ((row ?? []).slice(0, 11).some((v) => v)) last = r; });
   for (const w of writes) if (w.col < 11 && w.row > last) last = w.row;
   const range = `A1:K${last + 1}`;
+
+  // 수정으로 다시 만든 경우 예전 탭은 지운다(시트에 탭이 쌓이지 않게)
+  if (replaceGid !== null && replaceGid !== gid) {
+    await gapi(token, "POST", `${API}/${sheetId}:batchUpdate`, { requests: [{ deleteSheet: { sheetId: replaceGid } }] }).catch(() => {});
+  }
 
   return { title, gid, sheetId, range, url: `https://docs.google.com/spreadsheets/d/${sheetId}/edit#gid=${gid}`, totals: t };
 }
@@ -273,4 +286,16 @@ export async function exportPdf(sheetId: string, gid: number, range: string, saJ
   const buf = new Uint8Array(await r.arrayBuffer());
   if (String.fromCharCode(...buf.slice(0, 5)) !== "%PDF-") throw new Error("PDF가 아닌 응답(시트 공유·권한 확인)");
   return buf;
+}
+
+// 조정표 읽기 — "다시" 명령용. 탭 이름이 바뀌었어도 gid 로 찾는다
+export async function readAdjust(sheetId: string, gid: number, saJson: string) {
+  const token = await googleToken(saJson);
+  const meta = await gapi(token, "GET", `${API}/${sheetId}?fields=sheets.properties(sheetId,title)`);
+  const tab = meta.sheets.map((s: any) => s.properties).find((p: any) => p.sheetId === gid);
+  if (!tab) throw new Error("견적 탭을 못 찾음(지워졌거나 이름이 바뀜) — 수정: 명령으로 고쳐 주세요");
+  const range = encodeURIComponent(`${q1(tab.title)}!N${ADJ_ROW + 2}:N${ADJ_ROW + 14}`);
+  const j = await gapi(token, "GET", `${API}/${sheetId}/values/${range}`);
+  const vals = (j.values ?? []).map((r: any[]) => r[0] ?? "");
+  return { set: fromTable_(vals), title: tab.title };
 }

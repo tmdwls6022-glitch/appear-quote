@@ -114,6 +114,11 @@ function buildQuote_(r) {
     else { unit -= CFG.MEAL_DROP * skip; flags.push('식사 ' + skip + '끼 빼고 1인 ' + (CFG.MEAL_DROP * skip).toLocaleString() + '원 깎음 — 식사 문구(총 몇 식)는 직접 고쳐 주세요'); }
   }
 
+  if (Number(r.unitOverride) > 0) {   // jin 10/5: 조정장치 — 사람이 1인 단가를 직접 정함
+    flags.push('1인 단가를 직접 ' + Number(r.unitOverride).toLocaleString() + '원으로 정함(자동 계산 ' + unit.toLocaleString() + '원)');
+    unit = Number(r.unitOverride);
+  }
+
   var bbq = r.bbq !== false; // 언급 없으면 기본 포함
   if (period === '1박2일' && type === 'university') bbq = true;
 

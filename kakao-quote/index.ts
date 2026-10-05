@@ -8,6 +8,8 @@
 //   직원등록 이름   : 직원 등록 요청 (승인 전엔 견적 못 씀)
 //   견적: <요청 글>  : 견적서 작성
 //   결과            : 가장 최근 견적 결과 다시 보기 (콜백 승인 전용)
+//   수정: 인원 60, 단가 80000 … : 마지막 견적을 고쳐 다시 계산 (adjust.js, Gemini 안 부름)
+//   다시            : 시트 탭 오른쪽 '조정표'(N열)에서 고친 값으로 다시 계산
 //   모의 / 모의 새로 [v1] / 모의결과 : 카톡방 요청글로 읽기 정확도 시험 (mock.ts, 시트에 안 씀)
 // 답장 아래 버튼 [PDF] [사진] [시트] — 누르면 그때 견적서 부분(A~K열)만 PDF·PNG로 만든다(jin 10/5).
 //   링크: GET ?f=pdf|png&j=작업번호&k=비밀값. 시트에서 고친 내용도 누를 때 반영된다.
@@ -20,7 +22,8 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { buildQuote_, assignRooms_, busyFromBookings_, scheduleLine_ } from "./core.js";
 import { CFG } from "./core.js";
-import { writeQuote, exportPdf } from "./sheet.ts";
+import { writeQuote, exportPdf, readAdjust } from "./sheet.ts";
+import { parseEdit_, applyAdjust_, describe_, diff_ } from "./adjust.js";
 import { pdfToPng } from "./image.ts";
 import { startMock, runMock, mockSummary } from "./mock.ts";
 
@@ -64,6 +67,8 @@ const HELP = [
   "직원용 명령",
   "· 견적: (고객 견적요청 글 붙여넣기)",
   "· 결과 : 마지막 견적 다시 보기",
+  "· 수정: 인원 60, 단가 80000, 바베큐 빼기 : 마지막 견적 고치기",
+  "· 다시 : 시트 조정표(N열)를 고친 뒤 다시 계산",
   "· 모의 / 모의결과 : 견적 읽기 정확도 시험",
   "· 직원등록 이름 : 처음 한 번",
 ].join("\n");
@@ -211,8 +216,9 @@ function summary(q: any, t: any, url: string) {
   return lines.join("\n");
 }
 
-async function makeQuote(text: string) {
-  const req = await parseRequest(text);
+// adj: 수정·다시 명령일 때 — 고친 req 와 지울 예전 탭(gid). 이때는 Gemini 를 다시 부르지 않는다
+async function makeQuote(text: string, adj: { req: any; replaceGid: number | null; note: string } | null = null) {
+  const req = adj ? adj.req : await parseRequest(text);
   const q: any = buildQuote_(req);
   let bookings: any[] = [];
   if (q.checkin) {
@@ -222,17 +228,18 @@ async function makeQuote(text: string) {
   assignRooms_(q, busyFromBookings_(bookings));
   const sa = env("GOOGLE_SA_JSON");
   if (!sa) throw new Error("GOOGLE_SA_JSON 없음");
-  const w = await writeQuote(q, text, env("QUOTE_SHEET_ID") || DEFAULT_SHEET, sa);
-  return { reply: summary(q, w.totals, w.url), result: { title: w.title, url: w.url, q, t: w.totals,
+  const w = await writeQuote(q, text, env("QUOTE_SHEET_ID") || DEFAULT_SHEET, sa, req, adj?.replaceGid ?? null);
+  const reply = (adj ? `✏️ 수정 반영: ${adj.note}\n` : "") + summary(q, w.totals, w.url);
+  return { reply, result: { title: w.title, url: w.url, q, t: w.totals, req,
     sheetId: w.sheetId, gid: w.gid, range: w.range, share: crypto.randomUUID().replace(/-/g, "") } };
 }
 
 // ───────── 작업 실행 (콜백 또는 기록) ─────────
-async function runJob(userKey: string, text: string, callbackUrl: string | null) {
+async function runJob(userKey: string, text: string, callbackUrl: string | null, adj: { req: any; replaceGid: number | null; note: string } | null = null) {
   const sb = db();
   const { data: job } = await sb.from("quote_bot_jobs").insert({ user_key: userKey, request: text }).select("id").single();
   let reply: string, status = "done", result: unknown = null;
-  try { ({ reply, result } = await makeQuote(text)); }
+  try { ({ reply, result } = await makeQuote(text, adj)); }
   catch (e) { status = "error"; reply = `⚠️ 견적을 못 만들었어요: ${(e as Error).message}`; }
   if (job) await sb.from("quote_bot_jobs").update({ status, reply, result, finished_at: new Date().toISOString() }).eq("id", job.id);
   if (callbackUrl) {
@@ -302,7 +309,9 @@ Deno.serve(async (req) => {
   const m = utter.match(/^견적\s*[:：]?\s*([\s\S]+)$/);
   const isResult = /^결과$/.test(utter);
   const mock = utter.match(/^모의\s*(새로|결과)?\s*(v1)?$/i);
-  if (!m && !isResult && !mock) return json(kakaoText(HELP));
+  const edit = utter.match(/^수정\s*[:：]?\s*([\s\S]+)$/);
+  const redo = /^다시$/.test(utter);
+  if (!m && !isResult && !mock && !edit && !redo) return json(kakaoText(HELP));
 
   const { data: u } = await sb.from("quote_bot_users").select("approved").eq("user_key", userKey).maybeSingle();
   if (!u?.approved) return json(kakaoText('직원용 기능이에요. 처음이면 "직원등록 이름"을 보내 주세요.'));
@@ -313,6 +322,28 @@ Deno.serve(async (req) => {
     if (!last) return json(kakaoText("아직 만든 견적이 없어요."));
     if (last.status === "running") return json(kakaoText("아직 만드는 중이에요. 잠시 뒤 다시 '결과'를 보내 주세요."));
     return json(kakaoQuote(last.reply ?? "", last.id, last.result));
+  }
+
+  // 조정장치 — jin 10/5: 마지막 견적(Gemini 가 읽은 값)에 고친 값만 덮어써서 다시 계산. 예전 탭은 새 탭으로 바뀜
+  if (edit || redo) {
+    const { data: last } = await sb.from("quote_bot_jobs").select("id, status, request, result").eq("user_key", userKey)
+      .eq("status", "done").order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const r: any = last?.result;
+    if (!r?.req) return json(kakaoText("고칠 견적이 없어요. 먼저 \"견적: (요청글)\"로 견적을 만들어 주세요. (10/5 이전 견적은 수정이 안 돼요)"));
+    let set: any, bad: string[] = [];
+    if (edit) {
+      ({ set, bad } = parseEdit_(edit[1]));
+      if (!Object.keys(set).length) return json(kakaoText(`알아듣지 못했어요: ${bad.join(", ")}\n예) 수정: 인원 60, 아동 5, 단가 80000, 바베큐 빼기, 2인1실, 대강당, 날짜 2026-11-13, 2박, 종류 회사`));
+    } else {
+      try { set = diff_(r.req, (await readAdjust(r.sheetId, r.gid, env("GOOGLE_SA_JSON"))).set); }
+      catch (e) { return json(kakaoText(`⚠️ ${(e as Error).message}`)); }
+      if (!Object.keys(set).length) return json(kakaoText("조정표(N열)에서 바뀐 칸이 없어요. 칸을 고친 뒤 다시 보내 주세요."));
+    }
+    const note = describe_(set) + (bad.length ? ` (못 알아들은 것: ${bad.join(", ")})` : "");
+    // @ts-ignore EdgeRuntime는 Supabase 런타임 전역
+    EdgeRuntime.waitUntil(runJob(userKey, last!.request, callbackUrl, { req: applyAdjust_(r.req, set), replaceGid: r.gid ?? null, note }));
+    if (callbackUrl) return json({ version: "2.0", useCallback: true, data: { text: `고쳐서 다시 계산하는 중이에요: ${note}` } });
+    return json(kakaoText(`고쳐서 다시 계산하는 중이에요: ${note}\n20초 뒤 '결과'를 보내 주세요.`));
   }
 
   if (mock) {
