@@ -15,5 +15,6 @@
 - 흐름: 카카오 오픈빌더 스킬 → `index.ts`(Gemini로 요청 읽기, 노션 예약 확인) → `core.js`(가격 계산) → `sheet.ts`(Sheets API로 양식 탭 복사·칸 채우기) → 카톡 답장.
 - Supabase 비밀값(jin 직접 입력): `GEMINI_API_KEY`, `NOTION_TOKEN`, `GOOGLE_SA_JSON`(서비스 계정 키). 선택: `QUOTE_SHEET_ID`(기본은 '자동화 복습').
 - 견적 시트는 서비스 계정 이메일에 편집자로 공유해야 함.
+- 답장 아래 [PDF] [사진] [시트 열기] 버튼: 누를 때 견적서 부분(A~K열)만 PDF(구글 내보내기)·PNG(`image.ts`)로 만들어 보여 줌. 배율은 `core.js` 의 `CFG.EXPORT`.
 - 가격을 바꿀 때는 `kakao-quote/core.js`의 CFG를 고치고 다시 배포함. `견적자동작성.gs`는 시트 메뉴 버튼용 예전 판이라, 같이 고쳐야 같은 값이 됨.
 - 직원 승인: 채널에 "직원등록 이름" → `quote_bot_users.approved=true`.

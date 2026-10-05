@@ -21,7 +21,8 @@ export async function googleToken(saJson: string) {
   const key = await crypto.subtle.importKey("pkcs8", der, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
   const now = Math.floor(Date.now() / 1000);
   const unsigned = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" })) + "." + b64url(JSON.stringify({
-    iss: sa.client_email, scope: "https://www.googleapis.com/auth/spreadsheets",
+    // jin 10/5: PDF 내보내기(docs.google.com/export)에 drive.readonly 가 필요해 같이 받음
+    iss: sa.client_email, scope: "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.readonly",
     aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600,
   }));
   const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(unsigned));
@@ -246,5 +247,30 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
     fields: (m.note ? "note," : "") + "userEnteredFormat.backgroundColor" + (m.wrap ? ",userEnteredFormat.wrapStrategy" : ""),
   } })) });
 
-  return { title, gid, url: `https://docs.google.com/spreadsheets/d/${sheetId}/edit#gid=${gid}`, totals: t };
+  // 견적서 부분만(A~K열, 내용 있는 마지막 줄까지) — PDF·사진 버튼이 이 범위를 쓴다. M열 메모·요청 원문은 빠짐
+  let last = 0;
+  g.vals.forEach((row, r) => { if ((row ?? []).slice(0, 11).some((v) => v)) last = r; });
+  for (const w of writes) if (w.col < 11 && w.row > last) last = w.row;
+  const range = `A1:K${last + 1}`;
+
+  return { title, gid, sheetId, range, url: `https://docs.google.com/spreadsheets/d/${sheetId}/edit#gid=${gid}`, totals: t };
+}
+
+// ───────── PDF 내보내기 (구글이 직접 만든 PDF라 한글 글꼴이 들어 있음) ─────────
+// 배율은 CFG.EXPORT 에서 고친다.
+export async function exportPdf(sheetId: string, gid: number, range: string, saJson: string) {
+  const token = await googleToken(saJson);
+  const e = CFG.EXPORT;
+  const p = new URLSearchParams({
+    format: "pdf", gid: String(gid), range,
+    size: e.size, portrait: String(e.portrait), scale: String(e.scale), fitw: String(e.scale === 2),
+    top_margin: String(e.margin), bottom_margin: String(e.margin), left_margin: String(e.margin), right_margin: String(e.margin),
+    horizontal_alignment: "CENTER", vertical_alignment: "TOP",
+    gridlines: "false", printtitle: "false", sheetnames: "false", pagenum: "UNDEFINED", fzr: "false", printnotes: "false",
+  });
+  const r = await fetch(`https://docs.google.com/spreadsheets/d/${sheetId}/export?${p}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) throw new Error(`PDF 내보내기 ${r.status}`);
+  const buf = new Uint8Array(await r.arrayBuffer());
+  if (String.fromCharCode(...buf.slice(0, 5)) !== "%PDF-") throw new Error("PDF가 아닌 응답(시트 공유·권한 확인)");
+  return buf;
 }

@@ -3,3 +3,5 @@ node_modules/
 *.log
 supabase/.temp/
 .clasp.json
+preview/
+__pycache__/

@@ -38,8 +38,8 @@ var CFG = {
   // 강당: 인원 한도, 추가 대관 하루 요금
   HALLS: [
     { name: '1강당', cap: 20, extra: 300000 },
-    { name: '2강당', cap: 60, extra: 500000 },
-    { name: '3강당', cap: 60, extra: 500000 },
+    { name: '2강당', cap: 55, extra: 500000 },   // jin 10/5: 60 → 55 (여유)
+    { name: '3강당', cap: 55, extra: 500000 },   // 2강당과 같은 크기라 같이 내림
     { name: '4강당', cap: 130, extra: 800000 },
     { name: '독립대강당', cap: 300, extra: 1000000 }
   ],
@@ -240,7 +240,7 @@ function buildQuote_(r) {
     else { unit = type === 'church' ? CFG.PRICE['1박2일'].church : CFG.PRICE['1박2일'].group; tpl = '1박2일'; pkgName = '1박 2일 패키지'; }
     if (type !== 'university' && (month === 7 || month === 8)) unit += CFG.PEAK_1N;   // jin 10/3: 1박2일 7~8월 +1만
   } else if (period === '2박3일') {
-    if (month === 7 || month === 8) unit = CFG.PRICE['2박3일'].peak;
+    if (month === 7 || month === 8) unit = CFG.PRICE['2박3일'].peak;   // jin 10/5: 여름 대학도 일단 15만(여름 2박3일은 대개 교회) — 나중에 다시 정함
     else if (type === 'university') { unit = CFG.PRICE['2박3일'].uni; flags.push('대학 2박3일은 3식 10.8만 — 식사 문구를 총 3식으로 고쳐 주세요'); }
     else unit = hasWeekendNight_(r.checkin, nights) ? CFG.PRICE['2박3일'].offWeekend : CFG.PRICE['2박3일'].offWeekday;
     if (!r.checkin) flags.push('날짜를 몰라 평일 단가 사용');
@@ -248,6 +248,7 @@ function buildQuote_(r) {
   } else { unit = (CFG.PRICE[period].peak && (month === 7 || month === 8)) ? CFG.PRICE[period].peak : CFG.PRICE[period].def; tpl = 'long'; pkgName = '수련회 패키지'; }
   if (people >= 250) flags.push('대형 단체 특가(11.5~12만)는 대표 방침상 전화로만 — 견적가 확인');
   if (nights >= 2 && r.twinRoom) unit += CFG.TWIN_PER_NIGHT * nights;   // 2인1실: 1박당 +1만
+  if (nights === 1 && r.twinRoom && (type === 'church' || type === 'group')) unit += CFG.TWIN_PER_NIGHT;   // jin 10/5: 교회·일반 1박2일 2인1실도 +1만
   var skip = Number(r.skipMeals) || 0;
   if (skip > 0 && period !== '당일') {
     if (month === 7 || month === 8) flags.push('7~8월은 식사를 뺄 수 없음 — 고객이 ' + skip + '끼 빼 달라고 함');
