@@ -8,6 +8,7 @@
 //   직원등록 이름   : 직원 등록 요청 (승인 전엔 견적 못 씀)
 //   견적: <요청 글>  : 견적서 작성
 //   결과            : 가장 최근 견적 결과 다시 보기 (콜백 승인 전용)
+//   모의 / 모의 새로 / 모의결과 : 카톡방 요청글로 읽기 정확도 시험 (mock.ts, 시트에 안 씀)
 // 그 밖의 말은 안내 문구로 답한다. 고객에게 견적을 자동으로 보내지 않는다.
 //
 // 비밀값 (Supabase → Edge Functions → Secrets, jin이 직접 입력)
@@ -17,6 +18,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { buildQuote_, assignRooms_, busyFromBookings_, scheduleLine_ } from "./core.js";
 import { writeQuote } from "./sheet.ts";
+import { startMock, runMock, mockSummary } from "./mock.ts";
 
 const DEFAULT_SHEET = "1Ir02b_-zNbLCUkemxEG0yM63DCUJShUwhY0D_RkcDm0"; // 자동화 복습(테스트 시트)
 
@@ -41,6 +43,7 @@ const HELP = [
   "직원용 명령",
   "· 견적: (고객 견적요청 글 붙여넣기)",
   "· 결과 : 마지막 견적 다시 보기",
+  "· 모의 / 모의결과 : 견적 읽기 정확도 시험",
   "· 직원등록 이름 : 처음 한 번",
 ].join("\n");
 
@@ -65,12 +68,13 @@ function today() {
   return new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10); // KST
 }
 
-async function parseRequest(text: string) {
+// asof: 요청을 받은 날(모의 견적용). 없으면 오늘.
+async function parseRequest(text: string, asof?: string) {
   const key = env("GEMINI_API_KEY");
   if (!key) throw new Error("GEMINI_API_KEY 없음");
   const prompt = [
     "너는 수련원 예약 담당이야. 아래 고객 견적요청 글을 읽고 JSON 하나만 돌려줘. 모르는 값은 null.",
-    `오늘 날짜: ${today()} (연도가 없으면 오늘 이후 가장 가까운 날짜로).`,
+    `오늘 날짜: ${asof || today()} (연도가 없으면 오늘 이후 가장 가까운 날짜로).`,
     "필드:",
     "org(단체명), contact(담당자 이름), phone, adults(성인 수, 숫자), kids(초등 이하 수, 숫자, 없으면 0),",
     "checkin(YYYY-MM-DD), checkout(YYYY-MM-DD), nights(박 수, 당일이면 0),",
@@ -203,6 +207,16 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("ok");
   let body: any;
   try { body = await req.json(); } catch { return json(kakaoText(HELP)); }
+  // 모의 사례 올리기 (카톡 아님, tests/load_cases.py 가 직접 POST). 승인된 직원 키가 있어야 함. jin 10/5
+  if (Array.isArray(body?.mockCases)) {
+    const sb0 = db();
+    const { data: u0 } = await sb0.from("quote_bot_users").select("approved").eq("user_key", String(body.userKey ?? "")).maybeSingle();
+    if (!u0?.approved) return new Response("forbidden", { status: 403 });
+    const rows = body.mockCases.map((c: any) => ({ id: String(c.id), request: String(c.request), asof: c.asof,
+      expect: c.expect ?? {}, note: c.note ?? null, active: c.active ?? true }));
+    const { error } = await sb0.from("quote_test_cases").upsert(rows, { onConflict: "id" });
+    return json(error ? { ok: false, error: error.message } : { ok: true, count: rows.length });
+  }
   const ur = body?.userRequest ?? {};
   const userKey: string = ur.user?.id ?? "";
   const utter: string = String(ur.utterance ?? "").trim();
@@ -217,7 +231,8 @@ Deno.serve(async (req) => {
 
   const m = utter.match(/^견적\s*[:：]?\s*([\s\S]+)$/);
   const isResult = /^결과$/.test(utter);
-  if (!m && !isResult) return json(kakaoText(HELP));
+  const mock = utter.match(/^모의\s*(새로|결과)?$/);
+  if (!m && !isResult && !mock) return json(kakaoText(HELP));
 
   const { data: u } = await sb.from("quote_bot_users").select("approved").eq("user_key", userKey).maybeSingle();
   if (!u?.approved) return json(kakaoText('직원용 기능이에요. 처음이면 "직원등록 이름"을 보내 주세요.'));
@@ -228,6 +243,15 @@ Deno.serve(async (req) => {
     if (!last) return json(kakaoText("아직 만든 견적이 없어요."));
     if (last.status === "running") return json(kakaoText("아직 만드는 중이에요. 잠시 뒤 다시 '결과'를 보내 주세요."));
     return json(kakaoText(last.reply ?? ""));
+  }
+
+  if (mock) {
+    if (mock[1] === "결과") return json(kakaoText(await mockSummary(sb)));
+    const s = await startMock(sb, mock[1] === "새로");
+    if (!s.picked.length) return json(kakaoText("모의 사례가 없거나 지금 돌리는 중이에요. '모의결과'로 확인해 주세요."));
+    // @ts-ignore EdgeRuntime는 Supabase 런타임 전역
+    EdgeRuntime.waitUntil(runMock(sb, parseRequest, s.runId, s.picked));
+    return json(kakaoText(`모의 견적 ${s.runId}: ${s.done + 1}~${s.done + s.picked.length}번째 (전체 ${s.total}) 돌리는 중이에요. 1분쯤 뒤 '모의결과'를 보내 주세요.`));
   }
 
   const text = m![1].trim();
