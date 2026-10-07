@@ -17,11 +17,12 @@ export const CFG = {
   },
   KID_DISCOUNT: 20000,
   PENSION_EXTRA: 150000,
+  ONDOL_ROOMS: 34,                                     // 본관 온돌·침대 객실 수(노션 객실표 기준)
   PEAK_1N: 10000,                                      // 1박2일 7~8월 1인 추가
   TWIN_PER_NIGHT: 10000,                               // 2인1실 1인 1박당 추가 — jin 10/3
   MEAL_DROP: 10000,                                    // 식사 1끼 빼면 1인 −1만, 7~8월 불가 — jin 10/3
   ROOM_EXTRA: 60000,                                   // 객실 1실 추가(1박) — jin 10/3
-  MAIN_HALL_UPGRADE: 1000000,                          // 4강당 단체가 대강당 원할 때 하루 — jin 10/3, 7~8월 불가
+  MAIN_HALL_UPGRADE: 800000,                           // 4강당 단체가 대강당 원할 때 기본 — jin 10/7: 기본 80만, 성수기는 최대 300만까지도 받음
   // 견적서 PDF·사진 내보내기 — jin 10/5: 배율은 나중에 실제 화면 보고 조정
   EXPORT: {
     size: 'A4', portrait: true,
@@ -35,7 +36,7 @@ export const CFG = {
     { name: '2강당', cap: 55, extra: 500000 },   // jin 10/5: 60 → 55 (여유)
     { name: '3강당', cap: 55, extra: 500000 },   // 2강당과 같은 크기라 같이 내림
     { name: '4강당', cap: 130, extra: 800000 },
-    { name: '독립대강당', cap: 300, extra: 1000000 }
+    { name: '독립대강당', cap: 300, extra: 800000 }
   ],
   // 기간·종류별 복사할 양식 탭 (앞에서부터 있는 탭 사용)
   TEMPLATES: {
@@ -130,7 +131,7 @@ function buildQuote_(r) {
     adults: adults, kids: kids, people: people, period: period, nights: nights, days: days,
     checkin: r.checkin || null, checkout: r.checkout || null, scheduleText: r.scheduleText || '',
     type: type, unit: unit, tplKey: tpl, pkgName: pkgName, bbq: bbq, vat: vat,
-    twin: !!r.twinRoom, wantsMainHall: !!r.wantsMainHall, extraHallsWanted: r.extraHalls || [], extraRooms: Number(r.extraRooms) || 0, skipMeals: Number(r.skipMeals) || 0, month: month,
+    twin: !!r.twinRoom, wantsMainHall: !!r.wantsMainHall, pensionWanted: !!r.pensionWanted, extraHallsWanted: r.extraHalls || [], extraRooms: Number(r.extraRooms) || 0, skipMeals: Number(r.skipMeals) || 0, month: month,
     notes: r.notes || '', flags: flags, lines: [], extras: []
   };
 }
@@ -165,8 +166,7 @@ function assignRooms_(q, busy) {
     var h = hallInfo_(name);
     if (!h) { q.flags.push('추가 강당 "' + n + '"을(를) 못 알아봄'); return; }
     if (name === hall || seen[name]) return; seen[name] = 1;
-    if (name === '독립대강당' && (q.month === 7 || q.month === 8)) { q.flags.push('여름(7~8월)엔 작은 단체 대강당 대관 불가 — 대강당 줄 넣지 않음'); return; }
-    if (name === '독립대강당' && (q.month === 12 || q.month === 1 || q.month === 2)) q.flags.push('겨울 대강당 대관은 jin 결정 대기 — 하루 100만으로 적음, 진행 여부 확인');
+    if (name === '독립대강당' && (q.month === 7 || q.month === 8)) q.flags.push('성수기 대강당은 최대 300만 원까지도 받음(jin 10/7) — 기본 80만 원으로 적었으니 금액 확인');   // 10/7 jin: 예전 '7~8월 불가' 폐기
     if (busy.halls[name]) q.flags.push('추가 요청한 ' + name + '은(는) 그날 예약 있음');
     q.extraHalls.push({ name: name + ' (추가)', label: '추가 대관 ' + q.days + '일 (하루 ' + h.extra.toLocaleString() + '원)', day: h.extra, qty: q.days, amount: h.extra * q.days });
   });
@@ -176,9 +176,16 @@ function assignRooms_(q, busy) {
   }
 
   // 펜션동
-  var need = q.people <= 20 ? 0 : q.people <= 40 ? 1 : q.people <= 70 ? 2 : 3;
+  // jin 10/7: 펜션동은 요청한 사람만, 아니면 객실(본관 온돌 34실) 상황을 보고 넣는다. 가족모임·친목, 고등부·청년부 수련회, 동창회는 펜션 진행.
+  var need = 0;
+  if (q.pensionWanted) need = q.people <= 20 ? 0 : q.people <= 40 ? 1 : q.people <= 70 ? 2 : 3;
   if (q.nights === 0) { q.pensions = []; q.ondol = 0; q.ondolOnly = 0; return; }             // 당일: 숙박 없음
   if (q.type === 'university' && q.period === '1박2일') need = 0;           // MT: 본관만, 펜션은 동당 15만 선택
+  else if (!q.pensionWanted) {
+    var per = q.twin ? 2 : 3;
+    while (need < 3 && Math.ceil((q.people - need * 10) / per) > CFG.ONDOL_ROOMS) need++;
+    if (need) q.flags.push('본관 온돌 ' + CFG.ONDOL_ROOMS + '실로는 모자라 펜션 ' + need + '동을 넣음 — 객실 상황 확인');
+  }
   var free = ['A', 'B', 'C'].filter(function (d) { return !busy.pensions[d]; });
   if (free.length < need) q.flags.push('펜션 ' + need + '동 필요한데 ' + free.length + '동만 비어 있음');
   q.pensions = free.slice(0, need);

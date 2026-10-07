@@ -138,6 +138,20 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
     await gapi(token, "POST", `${API}/${sheetId}:batchUpdate`, { requests: reqs });
     g = await readGrid(token, sheetId, title);
   }
+  // jin 10/7: 주류무제한·무제한 바베큐 선택 줄은 이제 안 씀 → 양식 복사본에서 지운다(선택사항 아래 줄만)
+  {
+    const selNow = findCell(g, /선택사항/, head.row);
+    const dels: number[] = [];
+    if (selNow) for (let r = selNow.row + 1; r < g.vals.length; r++) {
+      const k = String(g.vals[r]?.[kindCol] ?? "").replace(/\s/g, "");
+      if (/^선택\)(주류무제한|무제한바베큐)/.test(k)) dels.push(r);
+    }
+    if (dels.length) {
+      await gapi(token, "POST", `${API}/${sheetId}:batchUpdate`, { requests: dels.sort((a, b) => b - a).map((r) => (
+        { deleteDimension: { range: { sheetId: gid, dimension: "ROWS", startIndex: r, endIndex: r + 1 } } })) });
+      g = await readGrid(token, sheetId, title);
+    }
+  }
   const shift = kidRow >= 0 ? 1 : 0;
   const hallRow2 = hallRow >= 0 ? hallRow + shift : -1;
 

@@ -107,6 +107,7 @@ const RULES = [
   "- customerType: 교회·성당·청년부·중고등부 → church / 대학교(학부)·학과·과대·동아리 → university / 대학원(특수·경영·교육대학원 포함)·사이버대학·야간대학 → adultuniv / 회사·(주)·기업 워크숍·관공서·구청·복지관·협회·재단·센터·노동조합 → company / 여행사·투어 → agency / 가족·친구·동창·동문·향우회·개인 모임 → group.",
   "- bbq: 바베큐·바비큐·BBQ 를 원하면 true, '바베큐 말고'처럼 빼 달라면 false, 말이 없으면 null.",
   "- wantsMainHall: '대강당'을 콕 집어 원할 때만 true. '강당 필요'만으로는 false.",
+  "- pensionWanted: 고객이 펜션·펜션동을 직접 원하거나, 가족모임·친목 모임, 고등부·청년부 수련회, 동창회·동문회처럼 친목 성격이면 true. 그 밖(회사·대학 MT·일반 교회)은 false.",
   "- twinRoom: '2인1실'을 원할 때만 true. vatDoc: 세금계산서·부가세 포함·카드결제를 말할 때만 true.",
 ];
 
@@ -123,7 +124,7 @@ async function parseRequest(text: string, asof?: string, variant?: string) {
     "scheduleText(고객이 쓴 일정 원문), customerType(church|company|university|adultuniv|group|agency 중 하나),",
     "bbq(true면 바베큐 원함, false면 원하지 않음/제외, null이면 언급 없음),",
     "twinRoom(2인1실 원하면 true), vatDoc(세금계산서·현금영수증·카드결제 언급 시 true),",
-    'extraHalls(추가로 쓰고 싶다는 강당 이름 배열, 예 ["1강당"]), wantsMainHall(대강당 원하면 true), extraRooms(객실을 몇 실 더 원하는지 숫자, 없으면 0), skipMeals(기본 패키지에서 빼 달라는 식사 끼니 수, 없으면 0),',
+    'extraHalls(추가로 쓰고 싶다는 강당 이름 배열, 예 ["1강당"]), wantsMainHall(대강당 원하면 true), pensionWanted(펜션 원하거나 친목·고등부·청년부 수련회·동창회면 true), extraRooms(객실을 몇 실 더 원하는지 숫자, 없으면 0), skipMeals(기본 패키지에서 빼 달라는 식사 끼니 수, 없으면 0),',
     'notes(그 밖의 요청 한 줄), unsure(확실하지 않은 점 배열, 예: "날짜 후보가 2개").',
     ...(variant === "v1" ? [] : ["", ...RULES]),
     "",
