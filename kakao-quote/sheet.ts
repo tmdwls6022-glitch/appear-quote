@@ -102,6 +102,35 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
     { updateSheetProperties: { properties: { sheetId: gid, title, index: 0 }, fields: "title,index" } },
   ] });
 
+  // 1-1. 필요 없는 줄 지우기 — jin 10/7
+  //  · 선택사항의 '주류 무제한'·'무제한 바베큐' 줄은 이제 안 씀
+  //  · 객실옵션 1·2가 필요 없는 단체(기본)는 옵션 1(펜션+온돌) 줄을 지우고 온돌 한 줄만 남김
+  {
+    const g0 = await readGrid(token, sheetId, title);
+    const h0 = findCell(g0, /^서비스종류$/);
+    if (h0) {
+      const kc = (g0.vals[h0.row] ?? []).indexOf("서비스종류");
+      const cc = (g0.vals[h0.row] ?? []).indexOf("내용");
+      const del: number[] = [];
+      let opt = 0, hasOpt = false;
+      const sel0 = findCell(g0, /선택사항/, h0.row);
+      for (let r = h0.row + 1; r < h0.row + 45 && r < g0.vals.length; r++) {
+        const k = String(g0.vals[r]?.[kc] ?? ""), c = String(g0.vals[r]?.[cc] ?? "");
+        if (/주류\s*무제한|무제한\s*바베큐/.test(k)) { del.push(r); continue; }
+        if (sel0 && r >= sel0.row) continue;
+        if (k) opt = /옵션\s*2/.test(k) ? 2 : /옵션\s*1/.test(k) ? 1 : /객실/.test(k) ? 3 : 0;
+        if (/옵션/.test(k)) hasOpt = true;
+        if (!q.roomOptions && q.nights > 0) {
+          if (opt === 1 && (k || /펜션|온돌|침대/.test(c))) del.push(r);                 // 옵션 1 두 줄
+          else if (opt === 3 && /펜션/.test(c)) del.push(r);                             // 옵션 없는 양식의 펜션 줄
+        }
+      }
+      if (q.roomOptions && !hasOpt) q.flags.push("이 양식엔 객실옵션 1·2 줄이 없어 한 가지로만 적었어요");
+      if (del.length) await gapi(token, "POST", `${API}/${sheetId}:batchUpdate`, { requests: del.sort((a, b) => b - a).map((r) => (
+        { deleteDimension: { range: { sheetId: gid, dimension: "ROWS", startIndex: r, endIndex: r + 1 } } })) });
+    }
+  }
+
   // 2. 줄 끼워 넣기 (추가 강당·객실, 아동 할인)
   let g = await readGrid(token, sheetId, title);
   const head = findCell(g, /^서비스종류$/);
@@ -197,7 +226,13 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
       setC(r, "수량", q.people); setC(r, "단가", "포함");
     } else if (isRoom && /펜션/.test(content)) {
       pensionDone = true;
-      if (!q.pensions.length && (isMt || hasFormula("세액") || hasFormula("합계"))) {
+      if (q.pensions.length && q.pensionPaid) {
+        // MT: 펜션은 1동 15만 추가 (실제 견적 230건) — 총액은 온돌 기준, 옵션 1을 고르면 더해짐
+        setC(r, "내용", pensionText_(q.pensions));
+        setC(r, "수량", q.pensions.length); setC(r, "단가", CFG.PENSION_EXTRA);
+        if (!hasFormula("합계")) setSum(r, CFG.PENSION_EXTRA * q.pensions.length);
+        q.flags.push(`MT 객실옵션 1은 펜션 ${q.pensions.length}동 × ${CFG.PENSION_EXTRA.toLocaleString()}원 추가 — 총액 칸에 들어갔는지 확인`);
+      } else if (!q.pensions.length && (isMt || hasFormula("세액") || hasFormula("합계"))) {
         // jin 10/7: MT 양식은 펜션 줄에 금액 수식이 있어 "미배정" 글자를 넣으면 #VALUE! 가 났음 → 숫자로 둔다
         setC(r, "내용", isMt ? `복층 펜션 (선택 시 1동 ${CFG.PENSION_EXTRA.toLocaleString()}원)` : pensionText_(q.pensions));
         setC(r, "수량", 0); setC(r, "단가", isMt ? CFG.PENSION_EXTRA : 0);
@@ -210,6 +245,7 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
       ondolDone = true;
       // 옵션 2(온돌만)는 전원을 온돌에, 그 밖(옵션 1·옵션 없는 양식)은 펜션에 못 들어간 사람만
       const rooms = roomOpt === 2 ? q.ondolOnly : q.ondol;
+      if (!q.roomOptions && /옵션/.test(kind)) { setC(r, "서비스종류", "객실"); setC(r, "비고", ""); }   // 옵션 1을 지운 뒤 남은 '객실옵션 2' → '객실'
       setC(r, "내용", `${q.twin ? "2인1실" : "3인1실"} 온돌룸 (본관동)`);
       setC(r, "수량", rooms); setC(r, "단가", "포함");
     } else if (isHall(kind) && !hallDone) {
