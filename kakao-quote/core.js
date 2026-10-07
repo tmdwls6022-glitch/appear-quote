@@ -16,6 +16,7 @@ export const CFG = {
     '4박5일': { def: 260000 }
   },
   KID_DISCOUNT: 20000,
+  ONDOL_ROOMS: 90, BED_ROOMS: 6,                       // jin 10/7: 본관동 96실 = 온돌 90 + 침대 6
   BBQ_300G_DISC: 4000,                                 // jin 10/7: 기본은 BBQ 무제한, 300g 원하면 1인 −4천
   PENSION_EXTRA: 150000,
   PEAK_1N: 10000,                                      // 1박2일 7~8월 1인 추가
@@ -196,6 +197,9 @@ function assignRooms_(q, busy) {
   var inPension = q.pensions.length * 10;
   q.ondol = Math.max(0, Math.ceil((q.people - inPension) / (q.twin ? 2 : 3)));
   q.ondolOnly = Math.ceil(q.people / (q.twin ? 2 : 3));   // 객실옵션 2: 펜션 없이 온돌만으로 전원
+  // jin 10/7: 본관동 96실 = 온돌룸 90 + 침대룸 6
+  var maxRooms = q.roomOptions ? q.ondol : q.ondolOnly;
+  if (maxRooms > CFG.ONDOL_ROOMS) q.flags.push('온돌 ' + maxRooms + '실 필요 — 본관 온돌은 ' + CFG.ONDOL_ROOMS + '실뿐(침대룸 ' + CFG.BED_ROOMS + '실·펜션 포함해 배치 확인)');
 }
 
 var YOUNG_RE_ = /청년|대학부|고등부|중고등|중등부|학생부|청소년|\bMT\b|엠티/i;

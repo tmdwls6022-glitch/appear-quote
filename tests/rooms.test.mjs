@@ -73,3 +73,8 @@ console.log("rooms.test 통과");
   assert.equal(pk("2027-07-14", 1), true);   // 7월
   console.log("rooms.test 9 통과");
 }
+{ // 10. 온돌 90실 한도
+  const f = (n) => run({ adults: n, checkin: "2026-11-13", nights: 1, customerType: "church" }).q.flags.some((x) => /온돌 90실뿐|90실뿐/.test(x));
+  assert.equal(f(270), false); assert.equal(f(273), true);
+  console.log("rooms.test 10 통과");
+}
