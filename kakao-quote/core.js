@@ -100,7 +100,9 @@ function buildQuote_(r) {
     else if (type === 'company' || type === 'agency' || type === 'adultuniv') { unit = r.twinRoom ? CFG.PRICE['1박2일'].company2 : CFG.PRICE['1박2일'].company3; tpl = 'company'; pkgName = '바베큐 패키지'; }
     else { unit = type === 'church' ? CFG.PRICE['1박2일'].church : CFG.PRICE['1박2일'].group; tpl = '1박2일'; pkgName = '1박 2일 패키지'; }
     var companyType = type === 'company' || type === 'agency' || type === 'adultuniv';
-    if (type !== 'university' && !(companyType && r.twinRoom) && (month === 7 || month === 8)) unit += CFG.PEAK_1N;   // jin 10/3: 1박2일 7~8월 +1만 (10/7: 회사 2인1실은 85,000원 그대로)
+    var winterPeak = (month === 1 || month === 2) && r.checkin && (function () { var w0 = new Date(r.checkin + 'T00:00:00').getDay(); return w0 === 5 || w0 === 6 || w0 === 0; })();   // jin 10/7: 1~2월 금·토·일도 성수기 +1만
+    if (type !== 'university' && !(companyType && r.twinRoom) && (month === 7 || month === 8 || winterPeak)) unit += CFG.PEAK_1N;
+    if (type !== 'university' && (month === 1 || month === 2) && !winterPeak) flags.push('1~2월 공휴일이 끼면 1인 +1만원 — 공휴일은 자동으로 못 봐요');   // jin 10/3: 1박2일 7~8월 +1만 (10/7: 회사 2인1실은 85,000원 그대로)
     if (r.twinRoom && (type === 'church' || type === 'group')) unit = CFG.PRICE['1박2일'].company2;   // jin 10/7: 교회·일반 1박2일 2인1실은 85,000원 고정
   } else if (period === '2박3일') {
     if (month === 7 || month === 8) unit = CFG.PRICE['2박3일'].peak;   // jin 10/5: 여름 대학도 일단 15만(여름 2박3일은 대개 교회) — 나중에 다시 정함

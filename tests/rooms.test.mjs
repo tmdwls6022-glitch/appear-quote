@@ -81,3 +81,10 @@ console.log("rooms.test 통과");
   assert.ok(w.q.flags.some((f) => /150만/.test(f)));
   console.log("rooms.test 8 통과");
 }
+{ // jin 10/7: 1~2월 금토일 1박2일 +1만
+  const { buildQuote_ } = await import('../kakao-quote/core.js');
+  const fri = buildQuote_({ checkin: '2027-01-08', nights: 1, adults: 30, customerType: 'church' });
+  const tue = buildQuote_({ checkin: '2027-01-05', nights: 1, adults: 30, customerType: 'church' });
+  if (fri.unit !== 85000 || tue.unit !== 75000) throw new Error('1~2월 금토일 +1만 실패 ' + fri.unit + ' ' + tue.unit);
+  console.log('1~2월 금토일 통과');
+}
