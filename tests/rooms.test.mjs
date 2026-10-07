@@ -17,10 +17,10 @@ for (const r of [
 ]) {
   ({ q } = run({ ...r, adults: 60, checkin: "2026-11-13", nights: 1 }));
   assert.equal(q.roomOptions, true, r.org);
-  assert.deepEqual(q.pensions, ["A", "B"]); assert.equal(q.ondol, 14); assert.equal(q.ondolOnly, 20);
+  assert.deepEqual(q.pensions, ["A"]); assert.equal(q.ondol, 12); assert.equal(q.ondolOnly, 20);   // 펜션 1동(25명) + 온돌 35명/3
 }
-// 펜션 수: 10~39명 1동, 40~69명 2동, 70명~ 3동
-for (const [n, k] of [[9, 0], [10, 1], [39, 1], [40, 2], [69, 2], [70, 3]]) {
+// 펜션 수: 10명 이상이면 1동만(jin 10/7 Q17·18)
+for (const [n, k] of [[9, 0], [10, 1], [39, 1], [40, 1], [69, 1], [70, 1]]) {
   ({ q } = run({ org: "청년부", adults: n, checkin: "2026-11-13", nights: 1, customerType: "church" }));
   assert.equal(q.pensions.length, k, n + "명");
 }
@@ -43,7 +43,7 @@ assert.equal(run({ adults: 40, checkin: "2027-07-16", nights: 1, customerType: "
 let r = run({ adults: 60, checkin: "2026-11-13", nights: 2, customerType: "church", wantsMainHall: true });
 assert.deepEqual(r.q.extraHalls.map((h) => [h.name, h.amount]), [["대강당 업그레이드", 800000]]);
 r = run({ adults: 60, checkin: "2027-07-16", nights: 1, customerType: "church", wantsMainHall: true });
-assert.equal(r.q.extraHalls[0].amount, 1500000); assert.ok(r.q.flags.some((f) => /300만/.test(f)));
+assert.equal(r.q.extraHalls[0].amount, 3000000); assert.ok(r.q.flags.some((f) => /300만/.test(f)));   // 7~8월 300만
 // 1~2월 금토일 낀 때도 150만, 평일만이면 80만
 assert.equal(run({ adults: 60, checkin: "2027-01-15", nights: 1, customerType: "church", wantsMainHall: true }).q.extraHalls[0].amount, 1500000);  // 금
 assert.equal(run({ adults: 60, checkin: "2027-01-12", nights: 1, customerType: "church", wantsMainHall: true }).q.extraHalls[0].amount, 800000);   // 화~수
@@ -89,11 +89,16 @@ console.log("rooms.test 통과");
   console.log('1~2월 금토일 통과');
 }
 { // 9. 성수기: 1~2월 금토일·공휴일
-  const pk = (ci, n) => run({ adults: 40, checkin: ci, nights: n, customerType: "church", wantsMainHall: true }).q.flags.some((f) => /150만/.test(f));
+  const pk = (ci, n) => run({ adults: 40, checkin: ci, nights: n, customerType: "church", wantsMainHall: true }).q.flags.some((f) => /최대 300만/.test(f));
   assert.equal(pk("2027-01-20", 1), false);  // 수~목
   assert.equal(pk("2027-01-22", 1), true);   // 금
   assert.equal(pk("2027-02-08", 1), true);   // 설 연휴(월)
   assert.equal(pk("2026-11-13", 1), false);  // 11월 금
   assert.equal(pk("2027-07-14", 1), true);   // 7월
   console.log("rooms.test 9 통과");
+}
+{ // 10. 온돌 90실 한도
+  const f = (n) => run({ adults: n, checkin: "2026-11-13", nights: 1, customerType: "church" }).q.flags.some((x) => /온돌 90실뿐|90실뿐/.test(x));
+  assert.equal(f(270), false); assert.equal(f(273), true);
+  console.log("rooms.test 10 통과");
 }

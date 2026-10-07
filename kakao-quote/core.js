@@ -12,15 +12,18 @@ export const CFG = {
     '당일': { bbq: 43000, korean: 30000, bbqHigh: 47000, koreanHigh: 37000 }, // jin 10/7: 평일 4.3만, 금·토·일·성수기 4.7만
     '1박2일': { church: 75000, group: 75000, company3: 75000, company2: 85000, mt: 49000 },
     '2박3일': { uni: 108000, offWeekday: 120000, offWeekend: 130000, peak: 150000 }, // 영업방 10/2: 평일 12, 주말 13, 7~8월 패키지 15
-    '3박4일': { def: 175000, peak: 185000 },        // jin 10/3: 비수기 17.5만, 7~8월 18.5만
+    '3박4일': { def: 185000, peak: 210000 },        // jin 10/7 Q9 '나': 실제 견적 18.5~21만이라 올림(비수기 18.5만, 7~8월 21만 — 정확한 값은 jin 확인)
     '4박5일': { def: 260000 }
   },
   KID_DISCOUNT: 20000,
+  PENSION_CAP: 25,
+  ONDOL_ROOMS: 90, BED_ROOMS: 6,                       // jin 10/7: 본관동 96실 = 온돌 90 + 침대 6
   PENSION_EXTRA: 150000,
   PEAK_1N: 10000,                                      // 1박2일 7~8월 1인 추가
   TWIN_PER_NIGHT: 10000,                               // 2인1실 1인 1박당 추가 — jin 10/3
   MEAL_DROP: 10000,                                    // 식사 1끼 빼면 1인 −1만, 7~8월 불가 — jin 10/3
   ROOM_EXTRA: 60000,                                   // 객실 1실 추가(1박) — jin 10/3
+  MAIN_HALL_UPGRADE_SUMMER: 3000000, // jin 10/7: 7~8월은 300만
   MAIN_HALL_UPGRADE_PEAK: 1500000,   // jin 10/7: 7~8월 전체, 1~2월 금·토·일·공휴일은 150~300만 — 일단 150만으로 적고 사람이 정함
   BBQ_300G_DROP: 4000,               // jin 10/7: BBQ 기본은 무제한, 300g 원하면 1인 −4천원
   MAIN_HALL_UPGRADE: 800000,   // jin 10/7: 작은 단체 대강당 업그레이드 기본 80만(한 번), 성수기는 300만까지 — 사람이 정함
@@ -180,7 +183,7 @@ function assignRooms_(q, busy) {
     if (name === '독립대강당' && q.wantsMainHall) {
       // jin 10/7: 작은 단체가 대강당을 원하면 '업그레이드' 기본 80만(박 수와 무관), 성수기(7~8월)는 300만까지 받음
       var up = CFG.MAIN_HALL_UPGRADE;
-      if (hallPeak_(q)) { up = CFG.MAIN_HALL_UPGRADE_PEAK; q.flags.push('성수기 대강당 업그레이드 — 150만으로 적음, 150~300만 사이에서 금액 정해 주세요(공휴일은 자동으로 못 봄)'); }
+      if (hallPeak_(q)) { up = (q.month === 7 || q.month === 8) ? CFG.MAIN_HALL_UPGRADE_SUMMER : CFG.MAIN_HALL_UPGRADE_PEAK; q.flags.push('성수기 대강당 업그레이드 — ' + (up / 10000) + '만으로 적음, 최대 300만까지 받음(금액 확인)'); }
       q.extraHalls.push({ name: '대강당 업그레이드', label: hall.replace(' OR 3강당', '') + ' → 대강당', day: up, qty: 1, amount: up });
       q.hall = '대강당';   // 강당 줄은 대강당으로 (실제 견적처럼), 업그레이드 비용은 아래 줄
       return;
@@ -195,15 +198,18 @@ function assignRooms_(q, busy) {
   // 객실 — jin 10/7: 기본은 3인1실 온돌만. 객실옵션 1(펜션+온돌)·2(온돌만)는 펜션·다인실을 요청했거나,
   // 젊은 층(MT·청년부·대학부·중고등부), 친목 모임(가족·동창·동호회)일 때만.
   q.roomOptions = roomOptions_(q);
-  var need = !q.roomOptions ? 0 : q.people < 10 ? 0 : q.people < 40 ? 1 : q.people < 70 ? 2 : 3;   // 실제 견적: 10~39명 1동, 40~69명 2동, 70명~ 3동
+  var need = !q.roomOptions ? 0 : q.people < 10 ? 0 : 1;   // jin 10/7 Q17·18: 펜션은 1동만(더 필요하면 사람이 정함)
   if (q.nights === 0) { q.pensions = []; q.ondol = 0; q.ondolOnly = 0; return; }             // 당일: 숙박 없음
   q.pensionPaid = q.type === 'university' && q.period === '1박2일';      // MT: 펜션은 1동 15만 추가
   var free = ['A', 'B', 'C'].filter(function (d) { return !busy.pensions[d]; });
   if (free.length < need) q.flags.push('펜션 ' + need + '동 필요한데 ' + free.length + '동만 비어 있음');
   q.pensions = free.slice(0, need);
-  var inPension = q.pensions.length * 10;
+  var inPension = q.pensions.length * CFG.PENSION_CAP;   // jin 10/7: 1동 25~30명
   q.ondol = Math.max(0, Math.ceil((q.people - inPension) / (q.twin ? 2 : 3)));
   q.ondolOnly = Math.ceil(q.people / (q.twin ? 2 : 3));   // 객실옵션 2: 펜션 없이 온돌만으로 전원
+  // jin 10/7: 본관동 96실 = 온돌룸 90 + 침대룸 6
+  var maxRooms = q.roomOptions ? q.ondol : q.ondolOnly;
+  if (maxRooms > CFG.ONDOL_ROOMS) q.flags.push('온돌 ' + maxRooms + '실 필요 — 본관 온돌은 ' + CFG.ONDOL_ROOMS + '실뿐(침대룸 ' + CFG.BED_ROOMS + '실·펜션 포함해 배치 확인)');
 }
 
 var YOUNG_RE_ = /청년|대학부|고등부|중고등|중등부|학생부|청소년|\bMT\b|엠티/i;
