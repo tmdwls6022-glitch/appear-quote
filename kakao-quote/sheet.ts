@@ -152,8 +152,32 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
       g = await readGrid(token, sheetId, title);
     }
   }
+  let collapsedRoom = -1;
   const shift = kidRow >= 0 ? 1 : 0;
-  const hallRow2 = hallRow >= 0 ? hallRow + shift : -1;
+  let hallRow2 = hallRow >= 0 ? hallRow + shift : -1;
+  // jin 10/7: 객실옵션 1·2는 펜션 요청·젊은 층·친목일 때만 → 아니면 펜션 줄과 옵션 2 줄을 지우고 '객실' 한 줄(3인1실 온돌룸)만 남긴다
+  let removed = 0;
+  if (!q.roomOptions && q.nights > 0) {
+    const dels: number[] = []; let ondolRow = -1, opt = 0;
+    for (let r = head.row + 1; r <= endRow + extras.length + shift; r++) {
+      const kind = g.vals[r]?.[kindCol] ?? "", content = col["내용"] !== undefined ? g.vals[r]?.[col["내용"]] ?? "" : "";
+      if (kind) opt = /옵션\s*2/.test(kind) ? 2 : /객실/.test(kind) ? 1 : 0;
+      if (!(/객실/.test(kind) || (!kind && opt > 0))) continue;
+      if (opt === 2) dels.push(r);
+      else if (/펜션/.test(content)) dels.push(r);
+      else if (/온돌|침대/.test(content) && ondolRow < 0) ondolRow = r;
+    }
+    if (ondolRow >= 0 && dels.length) {
+      await gapi(token, "POST", `${API}/${sheetId}:batchUpdate`, { requests: [...dels].sort((a, b) => b - a).map((r) => (
+        { deleteDimension: { range: { sheetId: gid, dimension: "ROWS", startIndex: r, endIndex: r + 1 } } })) });
+      removed = dels.length;
+      if (hallRow2 >= 0) hallRow2 -= dels.filter((r) => r < hallRow2).length;
+      g = await readGrid(token, sheetId, title);
+      // 지운 줄 때문에 옵션 이름이 사라졌을 수 있어 '객실'로 다시 적는다
+      const nr = ondolRow - dels.filter((r) => r < ondolRow).length;
+      collapsedRoom = nr;
+    }
+  }
 
   // 3. 칸 채우기 (메모리에 모았다가 한 번에)
   const writes: { row: number; col: number; v: unknown }[] = [];
@@ -182,16 +206,18 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
 
   const meals = CFG.MEALS[q.period];
   let hallDone = false, ondolDone = false, pensionDone = false;
+  if (collapsedRoom >= 0) setC(collapsedRoom, "서비스종류", "객실");
   // jin 10/7: 양식의 '객실옵션 1'(펜션+온돌)·'객실옵션 2'(온돌만). 옵션 1은 두 줄이 합친 칸이라
   // 둘째 줄(온돌)의 서비스종류가 비어 있음 → 위 줄의 옵션을 이어받는다.
   let roomOpt = 0;
   const isMt = q.type === "university" && q.period === "1박2일";
-  for (let r = head.row + 1; r <= endRow + extras.length + shift; r++) {
+  for (let r = head.row + 1; r <= endRow + extras.length + shift - removed; r++) {
     if (r === kidRow || (hallRow2 >= 0 && r > hallRow2 && r <= hallRow2 + extras.length)) continue;
     const kind = g.vals[r]?.[kindCol] ?? "";
     const content = col["내용"] !== undefined ? g.vals[r]?.[col["내용"]] ?? "" : "";
     if (kind) roomOpt = /옵션\s*2/.test(kind) ? 2 : /객실/.test(kind) ? 1 : 0;
-    const isRoom = /객실/.test(kind) || (!kind && roomOpt > 0);
+    if (r === collapsedRoom) roomOpt = 1;
+    const isRoom = /객실/.test(kind) || (!kind && roomOpt > 0) || r === collapsedRoom;
     const hasFormula = (k: string) => col[k] !== undefined && !!g.formula[r]?.[col[k]];
     if (/패키지$/.test(kind)) {
       setC(r, "서비스종류", q.pkgName);

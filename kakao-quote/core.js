@@ -179,7 +179,7 @@ function assignRooms_(q, busy) {
   // jin 10/7: 펜션동은 요청한 사람만, 아니면 객실(본관 온돌 34실) 상황을 보고 넣는다. 가족모임·친목, 고등부·청년부 수련회, 동창회는 펜션 진행.
   var need = 0;
   if (q.pensionWanted) need = q.people <= 20 ? 0 : q.people <= 40 ? 1 : q.people <= 70 ? 2 : 3;
-  if (q.nights === 0) { q.pensions = []; q.ondol = 0; q.ondolOnly = 0; return; }             // 당일: 숙박 없음
+  if (q.nights === 0) { q.pensions = []; q.ondol = 0; q.ondolOnly = 0; q.roomOptions = false; return; }             // 당일: 숙박 없음
   if (q.type === 'university' && q.period === '1박2일') need = 0;           // MT: 본관만, 펜션은 동당 15만 선택
   else if (!q.pensionWanted) {
     var per = q.twin ? 2 : 3;
@@ -192,6 +192,8 @@ function assignRooms_(q, busy) {
   var inPension = q.pensions.length * 10;
   q.ondol = Math.max(0, Math.ceil((q.people - inPension) / (q.twin ? 2 : 3)));
   q.ondolOnly = Math.ceil(q.people / (q.twin ? 2 : 3));   // 객실옵션 2: 펜션 없이 온돌만으로 전원
+  // jin 10/7: 객실옵션 1·2는 펜션·다인원 요청이나 젊은 층·친목 모임일 때만. 기본은 3인1실 온돌룸 한 줄. (MT는 양식의 펜션 선택 줄을 그대로 둠)
+  q.roomOptions = q.pensions.length > 0 || (q.type === 'university' && q.period === '1박2일');
 }
 
 function priceTotals_(q) {

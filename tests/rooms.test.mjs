@@ -33,4 +33,11 @@ assert.ok(q.pensions.length >= 2); assert.ok(q.flags.some((f) => /모자라/.tes
 assert.equal(q.extraHalls[0].day, 800000);
 ({ q } = run({ adults: 60, checkin: "2027-07-20", nights: 2, customerType: "church", wantsMainHall: true }));
 assert.equal(q.extraHalls.length, 1); assert.ok(q.flags.some((f) => /성수기 대강당/.test(f)));
+// 8. 객실옵션 1·2: 펜션이 들어가거나 MT일 때만, 기본은 온돌 한 줄
+({ q } = run({ adults: 60, checkin: "2027-01-17", nights: 2, customerType: "church" }));
+assert.equal(q.roomOptions, false);
+({ q } = run({ adults: 60, checkin: "2027-01-17", nights: 2, customerType: "church", pensionWanted: true }));
+assert.equal(q.roomOptions, true);
+({ q } = run({ adults: 40, checkin: "2026-11-06", nights: 1, customerType: "university" }));
+assert.equal(q.roomOptions, true);
 console.log("rooms.test 통과");
