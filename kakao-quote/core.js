@@ -9,13 +9,14 @@ export const CFG = {
   ACC_VAT: '신한 140-015-577115 (주)어피어플레이스',
   // 1인 단가(부가세 별도)
   PRICE: {
-    '당일': { bbq: 40000, korean: 30000, bbqHigh: 47000, koreanHigh: 37000 }, // jin 10/3: 금·토·일과 7~8월은 높은 값
+    '당일': { bbq: 43000, korean: 30000, bbqHigh: 47000, koreanHigh: 37000 }, // jin 10/3: 금·토·일과 7~8월은 높은 값 / jin 10/7: 평일 BBQ 4.3만
     '1박2일': { church: 75000, group: 75000, company3: 75000, company2: 85000, mt: 49000 },
     '2박3일': { uni: 108000, offWeekday: 130000, offWeekend: 130000, peak: 150000 }, // 영업방 10/2: 평일 12, 주말 13, 7~8월 패키지 15
     '3박4일': { def: 175000, peak: 185000 },        // jin 10/3: 비수기 17.5만, 7~8월 18.5만
     '4박5일': { def: 260000 }
   },
   KID_DISCOUNT: 20000,
+  BBQ_300G_DISC: 4000,                                 // jin 10/7: 기본은 BBQ 무제한, 300g 원하면 1인 −4천
   PENSION_EXTRA: 150000,
   PEAK_1N: 10000,                                      // 1박2일 7~8월 1인 추가
   TWIN_PER_NIGHT: 10000,                               // 2인1실 1인 1박당 추가 — jin 10/3
@@ -120,6 +121,8 @@ function buildQuote_(r) {
   }
 
   var bbq = r.bbq !== false; // 언급 없으면 기본 포함
+  var bbq300 = bbq && !!r.bbq300;
+  if (bbq300) { unit -= CFG.BBQ_300G_DISC; flags.push('BBQ 300g 요청 — 1인 ' + CFG.BBQ_300G_DISC.toLocaleString() + '원 뺌'); }
   if (period === '1박2일' && type === 'university') bbq = true;
 
   var days = Math.max(1, nights); // 강당 대관 "하루" = 박 수
@@ -129,7 +132,7 @@ function buildQuote_(r) {
     org: r.org || '단체명 미정', contact: r.contact || '', phone: r.phone || '',
     adults: adults, kids: kids, people: people, period: period, nights: nights, days: days,
     checkin: r.checkin || null, checkout: r.checkout || null, scheduleText: r.scheduleText || '',
-    type: type, unit: unit, tplKey: tpl, pkgName: pkgName, bbq: bbq, vat: vat,
+    type: type, unit: unit, tplKey: tpl, pkgName: pkgName, bbq: bbq, bbq300: bbq300, vat: vat,
     twin: !!r.twinRoom, wantsMainHall: !!r.wantsMainHall, wantsPension: !!r.wantsPension, extraHallsWanted: r.extraHalls || [], extraRooms: Number(r.extraRooms) || 0, skipMeals: Number(r.skipMeals) || 0, month: month,
     notes: r.notes || '', flags: flags, lines: [], extras: []
   };
@@ -168,7 +171,10 @@ function assignRooms_(q, busy) {
     if (busy.halls[name]) q.flags.push('추가 요청한 ' + name + '은(는) 그날 예약 있음');
     if (name === '독립대강당' && q.wantsMainHall) {
       // jin 10/7: 작은 단체가 대강당을 원하면 '업그레이드' 기본 80만(박 수와 무관), 성수기(7~8월)는 300만까지 받음
-      if (q.month === 7 || q.month === 8) q.flags.push('성수기 대강당 업그레이드 — 80만으로 적음, 최대 300만까지 받으니 금액 정해 주세요');
+      // jin 10/7: 7~8월 전체, 1~2월 금·토·일(공휴일 포함)은 150만~300만 — 사람이 정함
+      var winterWeekend = (q.month === 1 || q.month === 2) && hasWeekendNight_(q.checkin, Math.max(1, q.nights));
+      if (q.month === 7 || q.month === 8 || winterWeekend) q.flags.push('성수기 대강당 업그레이드 — 150만~300만 받는 기간(7~8월, 1~2월 금·토·일·공휴일). 80만으로 적었으니 금액 정해 주세요');
+      else if (q.month === 1 || q.month === 2) q.flags.push('1~2월 대강당 — 공휴일이면 150만~300만, 확인해 주세요');
       q.extraHalls.push({ name: '대강당 업그레이드', label: hall + ' → 대강당', day: CFG.MAIN_HALL_UPGRADE, qty: 1, amount: CFG.MAIN_HALL_UPGRADE });
       q.hall = '대강당';   // 강당 줄은 대강당으로 (실제 견적처럼), 업그레이드 비용은 아래 줄
       return;

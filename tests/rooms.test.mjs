@@ -54,3 +54,13 @@ assert.equal(run({ adults: 30, checkin: "2026-11-13", nights: 1, customerType: "
 ({ q } = run({ adults: 30, checkin: "2026-11-13", nights: 0, customerType: "church" }));
 assert.equal(q.ondolOnly, 0);
 console.log("rooms.test 통과");
+// 8. jin 10/7: BBQ 300g −4천, 당일 평일 4.3만·금토일 4.7만, 겨울 주말 대강당 확인
+{
+  const a = run({ adults: 40, checkin: "2026-11-13", nights: 1, customerType: "church", bbq300: true });
+  assert.equal(a.q.unit, 71000); assert.equal(a.q.bbq300, true);
+  assert.equal(run({ adults: 40, checkin: "2026-11-11", nights: 0, customerType: "company" }).q.unit, 43000);   // 수
+  assert.equal(run({ adults: 40, checkin: "2026-11-14", nights: 0, customerType: "company" }).q.unit, 47000);   // 토
+  const w = run({ adults: 40, checkin: "2027-01-22", nights: 2, customerType: "church", wantsMainHall: true });
+  assert.ok(w.q.flags.some((f) => /150만/.test(f)));
+  console.log("rooms.test 8 통과");
+}

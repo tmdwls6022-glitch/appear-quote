@@ -215,6 +215,7 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
       setC(r, "세액", q.vat ? Math.round(q.unit * 0.1) : 0);
       setSum(r, q.vat ? Math.round(q.unit * 1.1) * q.people : q.unit * q.people);
     } else if (/^BBQ/.test(kind)) {
+      if (q.bbq300) setC(r, "서비스종류", "BBQ 300g");   // jin 10/7: 기본 무제한, 300g 요청 때만
       setC(r, "수량", q.bbq ? q.people : "—");
       setC(r, "단가", q.bbq ? meals.bbq : "제외");
       if (!q.bbq) setC(r, "내용", "미이용");

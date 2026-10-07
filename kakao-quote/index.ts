@@ -122,7 +122,7 @@ async function parseRequest(text: string, asof?: string, variant?: string) {
     "org(단체명), contact(담당자 이름), phone, adults(성인 수, 숫자), kids(초등 이하 수, 숫자, 없으면 0),",
     "checkin(YYYY-MM-DD), checkout(YYYY-MM-DD), nights(박 수, 당일이면 0),",
     "scheduleText(고객이 쓴 일정 원문), customerType(church|company|university|adultuniv|group|agency 중 하나),",
-    "bbq(true면 바베큐 원함, false면 원하지 않음/제외, null이면 언급 없음),",
+    "bbq(true면 바베큐 원함, false면 원하지 않음/제외, null이면 언급 없음), bbq300(바베큐를 '300g'·정량으로 달라고 하면 true),",
     "twinRoom(2인1실 원하면 true), wantsPension(펜션·다인실 원하면 true), vatDoc(세금계산서·현금영수증·카드결제 언급 시 true),",
     'extraHalls(추가로 쓰고 싶다는 강당 이름 배열, 예 ["1강당"]), wantsMainHall(대강당 원하면 true), extraRooms(객실을 몇 실 더 원하는지 숫자, 없으면 0), skipMeals(기본 패키지에서 빼 달라는 식사 끼니 수, 없으면 0),',
     'notes(그 밖의 요청 한 줄), unsure(확실하지 않은 점 배열, 예: "날짜 후보가 2개").',
