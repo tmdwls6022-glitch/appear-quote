@@ -112,11 +112,14 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
       const kc = (g0.vals[h0.row] ?? []).indexOf("서비스종류");
       const cc = (g0.vals[h0.row] ?? []).indexOf("내용");
       const del: number[] = [];
+      const dropSnack = q.type === "church" || /아동센터|지역아동|중학교|고등학교|중고등/.test(`${q.org} ${q.notes}`);
       let opt = 0, hasOpt = false;
       const sel0 = findCell(g0, /선택사항/, h0.row);
       for (let r = h0.row + 1; r < h0.row + 45 && r < g0.vals.length; r++) {
         const k = String(g0.vals[r]?.[kc] ?? ""), c = String(g0.vals[r]?.[cc] ?? "");
         if (/주류\s*무제한|무제한\s*바베큐/.test(k)) { del.push(r); continue; }
+        // jin 10/7: 2차 안주(닭발·오뎅탕 등)는 교회팀·아동센터·중고등학교에는 안 보냄
+        if (dropSnack && /2차\s*안주|닭발|오뎅탕/.test(k + " " + c)) { del.push(r); continue; }
         if (sel0 && r >= sel0.row) continue;
         if (k) opt = /옵션\s*2/.test(k) ? 2 : /옵션\s*1/.test(k) ? 1 : /객실/.test(k) ? 3 : 0;
         if (/옵션/.test(k)) hasOpt = true;
@@ -158,7 +161,7 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
     reqs.push({ insertDimension: { range: { sheetId: gid, dimension: "ROWS", startIndex: hallRow + 1, endIndex: hallRow + 1 + extras.length }, inheritFromBefore: true } });
     reqs.push(copyFmt(hallRow, hallRow + 1, extras.length));
   }
-  const kidRow = q.kids && pkgRow >= 0 && hallRow >= 0 ? pkgRow + 1 : -1;
+  const kidRow = -1;   // jin 10/7: 초등 이하 할인은 사람이 정함 → 할인 줄을 넣지 않는다
   if (kidRow >= 0) {
     reqs.push({ insertDimension: { range: { sheetId: gid, dimension: "ROWS", startIndex: kidRow, endIndex: kidRow + 1 }, inheritFromBefore: true } });
     reqs.push(copyFmt(pkgRow, kidRow, 1));
@@ -226,18 +229,18 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
       setC(r, "수량", q.people); setC(r, "단가", "포함");
     } else if (isRoom && /펜션/.test(content)) {
       pensionDone = true;
-      if (q.pensions.length && q.pensionPaid) {
+      if (false) {
         // MT: 펜션은 1동 15만 추가 (실제 견적 230건) — 총액은 온돌 기준, 옵션 1을 고르면 더해짐
         setC(r, "내용", pensionText_(q.pensions));
         setC(r, "수량", q.pensions.length); setC(r, "단가", CFG.PENSION_EXTRA);
         setC(r, "세액", q.vat ? Math.round(CFG.PENSION_EXTRA * 0.1) : 0);   // 양식 수식이 10%를 붙여 MT인데 부가세가 들어갔었음
         setSum(r, CFG.PENSION_EXTRA * q.pensions.length * (q.vat ? 1.1 : 1));
         q.flags.push(`총액에 MT 펜션 ${q.pensions.length}동(객실옵션 1) ${(CFG.PENSION_EXTRA * q.pensions.length).toLocaleString()}원 포함 — 옵션 2(온돌만)를 고르면 빼 주세요`);
-      } else if (!q.pensions.length && (isMt || hasFormula("세액") || hasFormula("합계"))) {
+      } else if ((!q.pensions.length || q.pensionPaid) && (isMt || hasFormula("세액") || hasFormula("합계"))) {
         // jin 10/7: MT 양식은 펜션 줄에 금액 수식이 있어 "미배정" 글자를 넣으면 #VALUE! 가 났음 → 숫자로 둔다
         setC(r, "내용", isMt ? `복층 펜션 (선택 시 1동 ${CFG.PENSION_EXTRA.toLocaleString()}원)` : pensionText_(q.pensions));
         setC(r, "수량", 0); setC(r, "단가", isMt ? CFG.PENSION_EXTRA : 0);
-        if (isMt) q.flags.push(`MT는 본관 온돌 기본 — 펜션은 선택(1동 ${CFG.PENSION_EXTRA.toLocaleString()}원). 고객이 원하면 객실옵션 1 수량을 넣어 주세요`);
+        if (isMt) q.flags.push(`MT는 본관 온돌 기본 — 펜션은 선택(1동 ${CFG.PENSION_EXTRA.toLocaleString()}원, 금액은 사람이 정함${q.pensions.length ? ", 펜션 " + q.pensions.join("·") + "동 가능" : ""}). 고객이 원하면 객실옵션 1 수량을 넣어 주세요`);
       } else {
         setC(r, "내용", pensionText_(q.pensions));
         setC(r, "수량", q.pensions.length); setC(r, "단가", q.pensions.length ? "포함" : "미배정");
