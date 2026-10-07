@@ -88,3 +88,12 @@ console.log("rooms.test 통과");
   if (fri.unit !== 85000 || tue.unit !== 75000) throw new Error('1~2월 금토일 +1만 실패 ' + fri.unit + ' ' + tue.unit);
   console.log('1~2월 금토일 통과');
 }
+{ // 9. 성수기: 1~2월 금토일·공휴일
+  const pk = (ci, n) => run({ adults: 40, checkin: ci, nights: n, customerType: "church", wantsMainHall: true }).q.flags.some((f) => /150만/.test(f));
+  assert.equal(pk("2027-01-20", 1), false);  // 수~목
+  assert.equal(pk("2027-01-22", 1), true);   // 금
+  assert.equal(pk("2027-02-08", 1), true);   // 설 연휴(월)
+  assert.equal(pk("2026-11-13", 1), false);  // 11월 금
+  assert.equal(pk("2027-07-14", 1), true);   // 7월
+  console.log("rooms.test 9 통과");
+}
