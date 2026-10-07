@@ -218,6 +218,7 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
       setC(r, "세액", q.vat ? Math.round(q.unit * 0.1) : 0);
       setSum(r, q.vat ? Math.round(q.unit * 1.1) * q.people : q.unit * q.people);
     } else if (/^BBQ/.test(kind)) {
+      if (q.bbq300) setC(r, "서비스종류", "BBQ 300g");   // jin 10/7: 기본 무제한, 300g 요청 때만
       setC(r, "수량", q.bbq ? q.people : "—");
       setC(r, "단가", q.bbq ? meals.bbq : "제외");
       if (!q.bbq) setC(r, "내용", "미이용");
@@ -277,9 +278,9 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
   // 합계·계약금·잔금
   const vatTxt = q.vat ? "부가세 포함" : "부가세 제외";
   const tot = findCell(g, /^총 금액 \(/);
-  if (tot) { put(tot.row, tot.col, `총 금액 (식사+강당+음향기기)${vatTxt}`); const x = rightOf(g, tot); if (!g.formula[x.row]?.[x.col]) put(x.row, x.col, t.total); }
+  if (tot) { put(tot.row, tot.col, `총 금액 (식사+강당+음향기기)${vatTxt}`); const x = rightOf(g, tot); if (extras.length || !g.formula[x.row]?.[x.col]) put(x.row, x.col, t.total); }
   const top = findCell(g, /^총 금액$/);
-  if (top) { const x = rightOf(g, top); if (!g.formula[x.row]?.[x.col]) put(x.row, x.col, t.total); }
+  if (top) { const x = rightOf(g, top); if (extras.length || !g.formula[x.row]?.[x.col]) put(x.row, x.col, t.total); }   // 추가 강당·업그레이드 줄은 양식 합계 수식에 안 잡혀 값으로 덮음(10/7 시험: 총액 876만 → 1026만)
   for (const [re, amount] of [[/^계약금 입금/, t.deposit], [/^잔금/, t.balance]] as [RegExp, number][]) {
     const c = findCell(g, re); if (!c) continue;
     const a = rightOf(g, c); put(a.row, a.col, t.account);
