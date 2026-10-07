@@ -3,9 +3,9 @@
 //   ② 카톡에 "수정: 인원 60, 단가 80000, 바베큐 빼기"
 // 두 방법 모두 결국 Gemini 가 읽은 요청(req)에 덮어쓰고 core.js 로 다시 계산한다(Gemini 다시 안 부름).
 
-const TYPE_KO = { church: '교회', company: '회사', university: '대학', group: '일반', agency: '여행사' };
+const TYPE_KO = { church: '교회', company: '회사', university: '대학', adultuniv: '대학원', group: '일반', agency: '여행사' };
 const TYPE_EN = { 교회: 'church', 성당: 'church', 회사: 'company', 기업: 'company', 기관: 'company', 관공서: 'company',
-  대학: 'university', 대학교: 'university', 학교: 'university', 일반: 'group', 개인: 'group', 가족: 'group', 여행사: 'agency' };
+  대학: 'university', 대학교: 'university', 학교: 'university', 대학원: 'adultuniv', 사이버대: 'adultuniv', 야간대: 'adultuniv', 일반: 'group', 개인: 'group', 가족: 'group', 여행사: 'agency' };
 const OX = (v) => (v ? 'O' : 'X');
 const yes = (s) => /^(o|O|ㅇ|예|네|있음|포함|true|1|y|Y)$/.test(String(s).trim());
 const no = (s) => /^(x|X|아니오|아니요|없음|빼기|제외|false|0|n|N)$/.test(String(s).trim());
@@ -17,7 +17,7 @@ const ROWS = [
   ['초등 이하', 'kids', (r) => r.kids ?? 0, num],
   ['체크인 (YYYY-MM-DD)', 'checkin', (r) => r.checkin ?? '', (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v).trim()) ? String(v).trim() : undefined],
   ['박 수 (당일 0)', 'nights', (r) => r.nights ?? '', num],
-  ['단체종류 (교회/회사/대학/일반/여행사)', 'customerType', (r) => TYPE_KO[r.customerType] ?? '', (v) => TYPE_EN[String(v).trim()]],
+  ['단체종류 (교회/회사/대학/대학원/일반/여행사)', 'customerType', (r) => TYPE_KO[r.customerType] ?? '', (v) => TYPE_EN[String(v).trim()]],
   ['바베큐 (O/X)', 'bbq', (r) => OX(r.bbq !== false), (v) => yes(v) ? true : no(v) ? false : undefined],
   ['2인1실 (O/X)', 'twinRoom', (r) => OX(!!r.twinRoom), (v) => yes(v) ? true : no(v) ? false : undefined],
   ['대강당 (O/X)', 'wantsMainHall', (r) => OX(!!r.wantsMainHall), (v) => yes(v) ? true : no(v) ? false : undefined],

@@ -168,10 +168,17 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
 
   const meals = CFG.MEALS[q.period];
   let hallDone = false, ondolDone = false, pensionDone = false;
+  // jin 10/7: 양식의 '객실옵션 1'(펜션+온돌)·'객실옵션 2'(온돌만). 옵션 1은 두 줄이 합친 칸이라
+  // 둘째 줄(온돌)의 서비스종류가 비어 있음 → 위 줄의 옵션을 이어받는다.
+  let roomOpt = 0;
+  const isMt = q.type === "university" && q.period === "1박2일";
   for (let r = head.row + 1; r <= endRow + extras.length + shift; r++) {
     if (r === kidRow || (hallRow2 >= 0 && r > hallRow2 && r <= hallRow2 + extras.length)) continue;
     const kind = g.vals[r]?.[kindCol] ?? "";
     const content = col["내용"] !== undefined ? g.vals[r]?.[col["내용"]] ?? "" : "";
+    if (kind) roomOpt = /옵션\s*2/.test(kind) ? 2 : /객실/.test(kind) ? 1 : 0;
+    const isRoom = /객실/.test(kind) || (!kind && roomOpt > 0);
+    const hasFormula = (k: string) => col[k] !== undefined && !!g.formula[r]?.[col[k]];
     if (/패키지$/.test(kind)) {
       setC(r, "서비스종류", q.pkgName);
       setC(r, "내용", `${plabel} ${q.people}명(최소보증인원)`);
@@ -188,14 +195,23 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
     } else if (/^한식/.test(kind)) {
       setC(r, "내용", q.bbq ? meals.korean : (meals.noBbq || meals.korean));
       setC(r, "수량", q.people); setC(r, "단가", "포함");
-    } else if (/객실/.test(kind) && /펜션/.test(content)) {
+    } else if (isRoom && /펜션/.test(content)) {
       pensionDone = true;
-      setC(r, "내용", pensionText_(q.pensions));
-      setC(r, "수량", q.pensions.length); setC(r, "단가", q.pensions.length ? "포함" : "미배정");
-    } else if (/객실/.test(kind) && /온돌|침대/.test(content)) {
+      if (!q.pensions.length && (isMt || hasFormula("세액") || hasFormula("합계"))) {
+        // jin 10/7: MT 양식은 펜션 줄에 금액 수식이 있어 "미배정" 글자를 넣으면 #VALUE! 가 났음 → 숫자로 둔다
+        setC(r, "내용", isMt ? `복층 펜션 (선택 시 1동 ${CFG.PENSION_EXTRA.toLocaleString()}원)` : pensionText_(q.pensions));
+        setC(r, "수량", 0); setC(r, "단가", isMt ? CFG.PENSION_EXTRA : 0);
+        if (isMt) q.flags.push(`MT는 본관 온돌 기본 — 펜션은 선택(1동 ${CFG.PENSION_EXTRA.toLocaleString()}원). 고객이 원하면 객실옵션 1 수량을 넣어 주세요`);
+      } else {
+        setC(r, "내용", pensionText_(q.pensions));
+        setC(r, "수량", q.pensions.length); setC(r, "단가", q.pensions.length ? "포함" : "미배정");
+      }
+    } else if (isRoom && /온돌|침대/.test(content)) {
       ondolDone = true;
+      // 옵션 2(온돌만)는 전원을 온돌에, 그 밖(옵션 1·옵션 없는 양식)은 펜션에 못 들어간 사람만
+      const rooms = roomOpt === 2 ? q.ondolOnly : q.ondol;
       setC(r, "내용", `${q.twin ? "2인1실" : "3인1실"} 온돌룸 (본관동)`);
-      setC(r, "수량", q.ondol); setC(r, "단가", "포함");
+      setC(r, "수량", rooms); setC(r, "단가", "포함");
     } else if (isHall(kind) && !hallDone) {
       hallDone = true;
       setC(r, "서비스종류", q.hall);
@@ -232,7 +248,7 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
 
   // 요청 원문(M5)과 확인 메모(M3)
   put(4, 12, reqText);
-  const memo = [`[자동작성 확인용] ${q.period} / ${q.type} / 단가 ${q.unit.toLocaleString()} / 강당 ${q.hall} / 펜션 ${q.pensions.join("·") || "없음"} / 온돌 ${q.ondol}실 / 총액 ${t.total.toLocaleString()}${q.vat ? " (부가세 포함)" : ""}`];
+  const memo = [`[자동작성 확인용] ${q.period} / ${q.type} / 단가 ${q.unit.toLocaleString()} / 강당 ${q.hall} / 펜션 ${q.pensions.join("·") || "없음"} / 온돌 ${q.ondol}실(옵션2 온돌만 ${q.ondolOnly}실) / 총액 ${t.total.toLocaleString()}${q.vat ? " (부가세 포함)" : ""}`];
   if (q.flags.length) memo.push(`확인 필요: ${q.flags.join(" / ")}`);
   put(2, 12, memo.join("\n"));
   marks.push({ row: 2, col: 12, note: "", color: q.flags.length ? "#fff59d" : "#e8f5e9", wrap: true });

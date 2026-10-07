@@ -236,7 +236,7 @@ function buildQuote_(r) {
     unit = r.bbq === false ? (high ? dp.koreanHigh : dp.korean) : (high ? dp.bbqHigh : dp.bbq); tpl = 'TEMPLATES.당일'; pkgName = '당일 패키지'; }
   else if (period === '1박2일') {
     if (type === 'university') { unit = CFG.PRICE['1박2일'].mt; tpl = 'mt'; pkgName = 'MT 패키지'; }
-    else if (type === 'company' || type === 'agency') { unit = r.twinRoom ? CFG.PRICE['1박2일'].company2 : CFG.PRICE['1박2일'].company3; tpl = 'company'; pkgName = '바베큐 패키지'; }
+    else if (type === 'company' || type === 'agency' || type === 'adultuniv') { unit = r.twinRoom ? CFG.PRICE['1박2일'].company2 : CFG.PRICE['1박2일'].company3; tpl = 'company'; pkgName = '바베큐 패키지'; }
     else { unit = type === 'church' ? CFG.PRICE['1박2일'].church : CFG.PRICE['1박2일'].group; tpl = '1박2일'; pkgName = '1박 2일 패키지'; }
     if (type !== 'university' && (month === 7 || month === 8)) unit += CFG.PEAK_1N;   // jin 10/3: 1박2일 7~8월 +1만
   } else if (period === '2박3일') {
@@ -259,7 +259,7 @@ function buildQuote_(r) {
   if (period === '1박2일' && type === 'university') bbq = true;
 
   var days = Math.max(1, nights); // 강당 대관 "하루" = 박 수
-  var vat = !!r.vatDoc || type === 'company' || type === 'agency';
+  var vat = !!r.vatDoc || type === 'company' || type === 'agency';   // jin 10/7: 대학원·사이버대·야간대(adultuniv)는 회사 단가지만 부가세 없음·기본 계좌
 
   return {
     org: r.org || '단체명 미정', contact: r.contact || '', phone: r.phone || '',
@@ -313,13 +313,14 @@ function assignRooms_(q, busy) {
 
   // 펜션동
   var need = q.people <= 20 ? 0 : q.people <= 40 ? 1 : q.people <= 70 ? 2 : 3;
-  if (q.nights === 0) { q.pensions = []; q.ondol = 0; return; }             // 당일: 숙박 없음
+  if (q.nights === 0) { q.pensions = []; q.ondol = 0; q.ondolOnly = 0; return; }             // 당일: 숙박 없음
   if (q.type === 'university' && q.period === '1박2일') need = 0;           // MT: 본관만, 펜션은 동당 15만 선택
   var free = ['A', 'B', 'C'].filter(function (d) { return !busy.pensions[d]; });
   if (free.length < need) q.flags.push('펜션 ' + need + '동 필요한데 ' + free.length + '동만 비어 있음');
   q.pensions = free.slice(0, need);
   var inPension = q.pensions.length * 10;
   q.ondol = Math.max(0, Math.ceil((q.people - inPension) / (q.twin ? 2 : 3)));
+  q.ondolOnly = Math.ceil(q.people / (q.twin ? 2 : 3));   // 객실옵션 2: 펜션 없이 온돌만으로 전원
 }
 
 function priceTotals_(q) {
@@ -448,13 +449,15 @@ function fillSheet_(sh, q, reqText) {
   ['서비스종류', '내용', '수량', '단가', '세액', '합계', '비고'].forEach(function (k) { var i = hv.indexOf(k); if (i >= 0) col[k] = i + 1; });
   var endRow = (findCell_(sh, /선택사항/, head.row) || { row: head.row + 15 }).row - 1;
   var meals = CFG.MEALS[q.period];
-  var hallDone = false, ondolDone = false, pensionDone = false;
+  var hallDone = false, ondolDone = false, pensionDone = false, roomOpt = 0;
   var setC = function (r, k, v) { if (col[k]) sh.getRange(r, col[k]).setValue(v); };
   var setSum = function (r, v) { if (!col['합계']) return; var c = sh.getRange(r, col['합계']); if (!c.getFormula()) c.setValue(v); };
 
   for (var r = head.row + 1; r <= endRow; r++) {
     var kind = String(sh.getRange(r, col['서비스종류'] || 2).getDisplayValue()).trim();
     var content = col['내용'] ? String(sh.getRange(r, col['내용']).getDisplayValue()) : '';
+    if (kind) roomOpt = /옵션\s*2/.test(kind) ? 2 : /객실/.test(kind) ? 1 : 0;   // jin 10/7: 객실옵션 1·2
+    var isRoom = /객실/.test(kind) || (!kind && roomOpt > 0);
     if (/패키지$/.test(kind)) {
       setC(r, '서비스종류', q.pkgName);
       setC(r, '내용', plabel + ' ' + q.people + '명(최소보증인원)');
@@ -471,14 +474,14 @@ function fillSheet_(sh, q, reqText) {
     } else if (/^한식/.test(kind)) {
       setC(r, '내용', q.bbq ? meals.korean : (meals.noBbq || meals.korean));
       setC(r, '수량', q.people); setC(r, '단가', '포함');
-    } else if (/객실/.test(kind) && /펜션/.test(content)) {
+    } else if (isRoom && /펜션/.test(content)) {
       pensionDone = true;
       setC(r, '내용', pensionText_(q.pensions));
       setC(r, '수량', q.pensions.length); setC(r, '단가', q.pensions.length ? '포함' : '미배정');
-    } else if (/객실/.test(kind) && /온돌|침대/.test(content)) {
+    } else if (isRoom && /온돌|침대/.test(content)) {
       ondolDone = true;
       setC(r, '내용', (q.twin ? '2인1실' : '3인1실') + ' 온돌룸 (본관동)');
-      setC(r, '수량', q.ondol); setC(r, '단가', '포함');
+      setC(r, '수량', roomOpt === 2 ? q.ondolOnly : q.ondol); setC(r, '단가', '포함');
     } else if (/강당$|강당 OR|강당 or/.test(kind) && !/음향/.test(kind)) {
       if (!hallDone) {
         hallDone = true;

@@ -95,7 +95,7 @@ function buildQuote_(r) {
     unit = r.bbq === false ? (high ? dp.koreanHigh : dp.korean) : (high ? dp.bbqHigh : dp.bbq); tpl = 'TEMPLATES.당일'; pkgName = '당일 패키지'; }
   else if (period === '1박2일') {
     if (type === 'university') { unit = CFG.PRICE['1박2일'].mt; tpl = 'mt'; pkgName = 'MT 패키지'; }
-    else if (type === 'company' || type === 'agency') { unit = r.twinRoom ? CFG.PRICE['1박2일'].company2 : CFG.PRICE['1박2일'].company3; tpl = 'company'; pkgName = '바베큐 패키지'; }
+    else if (type === 'company' || type === 'agency' || type === 'adultuniv') { unit = r.twinRoom ? CFG.PRICE['1박2일'].company2 : CFG.PRICE['1박2일'].company3; tpl = 'company'; pkgName = '바베큐 패키지'; }
     else { unit = type === 'church' ? CFG.PRICE['1박2일'].church : CFG.PRICE['1박2일'].group; tpl = '1박2일'; pkgName = '1박 2일 패키지'; }
     if (type !== 'university' && (month === 7 || month === 8)) unit += CFG.PEAK_1N;   // jin 10/3: 1박2일 7~8월 +1만
   } else if (period === '2박3일') {
@@ -123,7 +123,7 @@ function buildQuote_(r) {
   if (period === '1박2일' && type === 'university') bbq = true;
 
   var days = Math.max(1, nights); // 강당 대관 "하루" = 박 수
-  var vat = !!r.vatDoc || type === 'company' || type === 'agency';
+  var vat = !!r.vatDoc || type === 'company' || type === 'agency';   // jin 10/7: 대학원·사이버대·야간대(adultuniv)는 회사 단가지만 부가세 없음·기본 계좌
 
   return {
     org: r.org || '단체명 미정', contact: r.contact || '', phone: r.phone || '',
@@ -177,13 +177,14 @@ function assignRooms_(q, busy) {
 
   // 펜션동
   var need = q.people <= 20 ? 0 : q.people <= 40 ? 1 : q.people <= 70 ? 2 : 3;
-  if (q.nights === 0) { q.pensions = []; q.ondol = 0; return; }             // 당일: 숙박 없음
+  if (q.nights === 0) { q.pensions = []; q.ondol = 0; q.ondolOnly = 0; return; }             // 당일: 숙박 없음
   if (q.type === 'university' && q.period === '1박2일') need = 0;           // MT: 본관만, 펜션은 동당 15만 선택
   var free = ['A', 'B', 'C'].filter(function (d) { return !busy.pensions[d]; });
   if (free.length < need) q.flags.push('펜션 ' + need + '동 필요한데 ' + free.length + '동만 비어 있음');
   q.pensions = free.slice(0, need);
   var inPension = q.pensions.length * 10;
   q.ondol = Math.max(0, Math.ceil((q.people - inPension) / (q.twin ? 2 : 3)));
+  q.ondolOnly = Math.ceil(q.people / (q.twin ? 2 : 3));   // 객실옵션 2: 펜션 없이 온돌만으로 전원
 }
 
 function priceTotals_(q) {

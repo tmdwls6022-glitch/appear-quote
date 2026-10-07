@@ -104,7 +104,7 @@ const RULES = [
   "- '27년', '27.8.13' 은 2027년. 연도가 없으면 오늘 이후 가장 가까운 날짜. 날짜 차이와 'N박'이 서로 안 맞으면 unsure 에 적는다.",
   "- nights 는 checkout - checkin 일수. 당일(숙박 없음)이면 0.",
   "- '견적요청날짜', '요청일', '신청 시간'은 글을 쓴 날이지 이용 날짜가 아니다. 이용 날짜가 없으면 checkin 은 null.",
-  "- customerType: 교회·성당·청년부·중고등부 → church / 대학교·대학원·학과·학부·동아리 → university / 회사·(주)·기업 워크숍·관공서·구청·복지관·협회·재단·센터·노동조합 → company / 여행사·투어 → agency / 가족·친구·동창·동문·향우회·개인 모임 → group.",
+  "- customerType: 교회·성당·청년부·중고등부 → church / 대학교(학부)·학과·과대·동아리 → university / 대학원(특수·경영·교육대학원 포함)·사이버대학·야간대학 → adultuniv / 회사·(주)·기업 워크숍·관공서·구청·복지관·협회·재단·센터·노동조합 → company / 여행사·투어 → agency / 가족·친구·동창·동문·향우회·개인 모임 → group.",
   "- bbq: 바베큐·바비큐·BBQ 를 원하면 true, '바베큐 말고'처럼 빼 달라면 false, 말이 없으면 null.",
   "- wantsMainHall: '대강당'을 콕 집어 원할 때만 true. '강당 필요'만으로는 false.",
   "- twinRoom: '2인1실'을 원할 때만 true. vatDoc: 세금계산서·부가세 포함·카드결제를 말할 때만 true.",
@@ -120,7 +120,7 @@ async function parseRequest(text: string, asof?: string, variant?: string) {
     "필드:",
     "org(단체명), contact(담당자 이름), phone, adults(성인 수, 숫자), kids(초등 이하 수, 숫자, 없으면 0),",
     "checkin(YYYY-MM-DD), checkout(YYYY-MM-DD), nights(박 수, 당일이면 0),",
-    "scheduleText(고객이 쓴 일정 원문), customerType(church|company|university|group|agency 중 하나),",
+    "scheduleText(고객이 쓴 일정 원문), customerType(church|company|university|adultuniv|group|agency 중 하나),",
     "bbq(true면 바베큐 원함, false면 원하지 않음/제외, null이면 언급 없음),",
     "twinRoom(2인1실 원하면 true), vatDoc(세금계산서·현금영수증·카드결제 언급 시 true),",
     'extraHalls(추가로 쓰고 싶다는 강당 이름 배열, 예 ["1강당"]), wantsMainHall(대강당 원하면 true), extraRooms(객실을 몇 실 더 원하는지 숫자, 없으면 0), skipMeals(기본 패키지에서 빼 달라는 식사 끼니 수, 없으면 0),',
@@ -206,7 +206,7 @@ function summary(q: any, t: any, url: string) {
   const lines = [
     `✅ ${q.org} 견적 탭을 만들었어요`,
     `${q.period} · ${q.checkin ? scheduleLine_(q) : "날짜 확인 필요"} · ${q.people}명`,
-    `1인 ${won(q.unit)} · ${q.hall} · 펜션 ${q.pensions.length ? q.pensions.join("·") : "없음"} · 온돌 ${q.ondol}실`,
+    `1인 ${won(q.unit)} · ${q.hall} · 객실 ①펜션 ${q.pensions.length ? q.pensions.join("·") : "없음"}+온돌 ${q.ondol}실 / ②온돌 ${q.ondolOnly}실`,
   ];
   for (const x of q.extraHalls ?? []) lines.push(`+ ${x.name} ${won(x.amount)}`);
   lines.push(`총 ${won(t.total)}${q.vat ? " (부가세 포함)" : ""}`);
