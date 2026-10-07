@@ -172,9 +172,7 @@ function assignRooms_(q, busy) {
     if (name === '독립대강당' && q.wantsMainHall) {
       // jin 10/7: 작은 단체가 대강당을 원하면 '업그레이드' 기본 80만(박 수와 무관), 성수기(7~8월)는 300만까지 받음
       // jin 10/7: 7~8월 전체, 1~2월 금·토·일(공휴일 포함)은 150만~300만 — 사람이 정함
-      var winterWeekend = (q.month === 1 || q.month === 2) && hasWeekendNight_(q.checkin, Math.max(1, q.nights));
-      if (q.month === 7 || q.month === 8 || winterWeekend) q.flags.push('성수기 대강당 업그레이드 — 150만~300만 받는 기간(7~8월, 1~2월 금·토·일·공휴일). 80만으로 적었으니 금액 정해 주세요');
-      else if (q.month === 1 || q.month === 2) q.flags.push('1~2월 대강당 — 공휴일이면 150만~300만, 확인해 주세요');
+      if (isPeak_(q)) q.flags.push('성수기 대강당 업그레이드 — 150만~300만 받는 기간(7~8월, 1~2월 금·토·일·공휴일). 80만으로 적었으니 금액 정해 주세요');
       q.extraHalls.push({ name: '대강당 업그레이드', label: hall + ' → 대강당', day: CFG.MAIN_HALL_UPGRADE, qty: 1, amount: CFG.MAIN_HALL_UPGRADE });
       q.hall = '대강당';   // 강당 줄은 대강당으로 (실제 견적처럼), 업그레이드 비용은 아래 줄
       return;
@@ -207,6 +205,22 @@ function roomOptions_(q) {
   if (q.type === 'university' || q.type === 'group') return true;    // MT, 가족·친구·동창 같은 일반 모임
   var t = (q.org || '') + ' ' + (q.notes || '');
   return YOUNG_RE_.test(t) || SOCIAL_RE_.test(t);
+}
+
+// 공휴일 (콜로그 Config.gs HOLIDAYS_ 와 같은 목록, 1~2월 성수기 판단용) — 새 해가 오면 더한다
+var HOLIDAYS_ = ['2026-01-01', '2026-02-16', '2026-02-17', '2026-02-18', '2027-01-01', '2027-02-06', '2027-02-07', '2027-02-08', '2027-02-09',
+  '2028-01-01', '2028-01-26', '2028-01-27', '2028-01-28'];
+// jin 10/7: 성수기 = 7~8월 전체 + 1~2월 금·토·일·공휴일 (지금은 대강당 업그레이드 금액 확인에만 씀 — 패키지 단가는 실제 견적도 1~2월 주말 13만)
+function isPeak_(q) {
+  if (q.month === 7 || q.month === 8) return true;
+  if (!(q.month === 1 || q.month === 2) || !q.checkin) return false;
+  var d = new Date(q.checkin + 'T00:00:00');
+  for (var i = 0; i <= Math.max(0, q.nights); i++) {
+    var x = new Date(d.getTime() + i * 86400000), w = x.getDay();
+    var s = x.getFullYear() + '-' + ('0' + (x.getMonth() + 1)).slice(-2) + '-' + ('0' + x.getDate()).slice(-2);
+    if ((i < Math.max(1, q.nights) && (w === 5 || w === 6 || w === 0)) || HOLIDAYS_.indexOf(s) >= 0) return true;
+  }
+  return false;
 }
 
 function priceTotals_(q) {
@@ -247,4 +261,4 @@ function pensionText_(list) {
   return out.join('\n');
 }
 
-export { roomOptions_, periodName_, periodLabel_, hasWeekendNight_, buildQuote_, smallestHallFor_, hallInfo_, assignRooms_, priceTotals_, busyFromBookings_, scheduleLine_, pensionText_ };
+export { isPeak_, roomOptions_, periodName_, periodLabel_, hasWeekendNight_, buildQuote_, smallestHallFor_, hallInfo_, assignRooms_, priceTotals_, busyFromBookings_, scheduleLine_, pensionText_ };
