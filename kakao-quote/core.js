@@ -169,7 +169,8 @@ function assignRooms_(q, busy) {
     if (name === '독립대강당' && q.wantsMainHall) {
       // jin 10/7: 작은 단체가 대강당을 원하면 '업그레이드' 기본 80만(박 수와 무관), 성수기(7~8월)는 300만까지 받음
       if (q.month === 7 || q.month === 8) q.flags.push('성수기 대강당 업그레이드 — 80만으로 적음, 최대 300만까지 받으니 금액 정해 주세요');
-      q.extraHalls.push({ name: '대강당 업그레이드', label: periodLabel_(q.period).replace(' ', '') + ' 단독사용', day: CFG.MAIN_HALL_UPGRADE, qty: 1, amount: CFG.MAIN_HALL_UPGRADE });
+      q.extraHalls.push({ name: '대강당 업그레이드', label: hall + ' → 대강당', day: CFG.MAIN_HALL_UPGRADE, qty: 1, amount: CFG.MAIN_HALL_UPGRADE });
+      q.hall = '대강당';   // 강당 줄은 대강당으로 (실제 견적처럼), 업그레이드 비용은 아래 줄
       return;
     }
     q.extraHalls.push({ name: name + ' (추가)', label: '추가 대관 ' + q.days + '일 (하루 ' + h.extra.toLocaleString() + '원)', day: h.extra, qty: q.days, amount: h.extra * q.days });
@@ -206,7 +207,9 @@ function priceTotals_(q) {
   var base = q.unit * q.people;
   var kidDisc = q.kids ? -CFG.KID_DISCOUNT * q.kids : 0;
   var extraHall = q.extraHalls.reduce(function (s, h) { return s + h.amount; }, 0);
-  var supply = base + kidDisc + extraHall;
+  // MT 펜션(1동 15만)은 실제 견적처럼 총액에 넣는다 (견적서 1~7: 159건 포함, 10건 미포함) — jin 10/7
+  var pension = q.pensionPaid && q.pensions ? CFG.PENSION_EXTRA * q.pensions.length : 0;
+  var supply = base + kidDisc + extraHall + pension;
   var total = q.vat ? Math.round(supply * 1.1) : supply;
   var deposit = Math.round(total * 0.3 / 100000) * 100000;
   if (q.period === '1박2일' && q.type === 'university') deposit = Math.min(deposit, 300000);

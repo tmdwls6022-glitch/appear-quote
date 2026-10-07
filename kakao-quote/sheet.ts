@@ -230,8 +230,9 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
         // MT: 펜션은 1동 15만 추가 (실제 견적 230건) — 총액은 온돌 기준, 옵션 1을 고르면 더해짐
         setC(r, "내용", pensionText_(q.pensions));
         setC(r, "수량", q.pensions.length); setC(r, "단가", CFG.PENSION_EXTRA);
-        if (!hasFormula("합계")) setSum(r, CFG.PENSION_EXTRA * q.pensions.length);
-        q.flags.push(`MT 객실옵션 1은 펜션 ${q.pensions.length}동 × ${CFG.PENSION_EXTRA.toLocaleString()}원 추가 — 총액 칸에 들어갔는지 확인`);
+        setC(r, "세액", q.vat ? Math.round(CFG.PENSION_EXTRA * 0.1) : 0);   // 양식 수식이 10%를 붙여 MT인데 부가세가 들어갔었음
+        setSum(r, CFG.PENSION_EXTRA * q.pensions.length * (q.vat ? 1.1 : 1));
+        q.flags.push(`총액에 MT 펜션 ${q.pensions.length}동(객실옵션 1) ${(CFG.PENSION_EXTRA * q.pensions.length).toLocaleString()}원 포함 — 옵션 2(온돌만)를 고르면 빼 주세요`);
       } else if (!q.pensions.length && (isMt || hasFormula("세액") || hasFormula("합계"))) {
         // jin 10/7: MT 양식은 펜션 줄에 금액 수식이 있어 "미배정" 글자를 넣으면 #VALUE! 가 났음 → 숫자로 둔다
         setC(r, "내용", isMt ? `복층 펜션 (선택 시 1동 ${CFG.PENSION_EXTRA.toLocaleString()}원)` : pensionText_(q.pensions));
