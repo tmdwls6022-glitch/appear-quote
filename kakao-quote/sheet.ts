@@ -123,6 +123,9 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
         if (sel0 && r >= sel0.row) continue;
         if (k) opt = /옵션\s*2/.test(k) ? 2 : /옵션\s*1/.test(k) ? 1 : /객실/.test(k) ? 3 : 0;
         if (/옵션/.test(k)) hasOpt = true;
+        if (q.nights === 0) {   // jin 10/10: 당일 — 숙박·조식 줄 없음 (실제 당일 견적 135건)
+          if (/^한식|조식/.test(k) || (opt > 0 && (/객실/.test(k) || /펜션|온돌|침대/.test(c)))) { del.push(r); continue; }
+        }
         if (!q.roomOptions && q.nights > 0) {
           if (opt === 1 && (k || /펜션|온돌|침대/.test(c))) del.push(r);                 // 옵션 1 두 줄
           else if (opt === 3 && /펜션/.test(c)) del.push(r);                             // 옵션 없는 양식의 펜션 줄
@@ -218,6 +221,13 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
       setC(r, "수량", q.people); setC(r, "단가", q.unit);
       setC(r, "세액", q.vat ? Math.round(q.unit * 0.1) : 0);
       setSum(r, q.vat ? Math.round(q.unit * 1.1) * q.people : q.unit * q.people);
+    } else if (/^BBQ/.test(kind) && q.nights === 0) {
+      // 당일: 'BBQ 무제한 점심/석식' (요청 시작 시각으로), 금액은 패키지에 포함
+      const hr = Number((reqText.match(/(\d{1,2})\s*시/) ?? [])[1] ?? 0);
+      setC(r, "서비스종류", (q.bbq300 ? "BBQ 300g" : "BBQ 무제한") + (hr >= 10 && hr <= 14 ? " 점심" : hr >= 15 ? " 석식" : ""));
+      setC(r, "수량", q.bbq ? q.people : "—"); setC(r, "단가", q.bbq ? "포함" : "제외");
+      if (!q.bbq) setC(r, "내용", "미이용");
+      if (col["비고"] !== undefined) setC(r, "비고", q.bbq ? "총 1식" : "");
     } else if (/^BBQ/.test(kind)) {
       if (q.bbq300) setC(r, "서비스종류", "BBQ 300g");   // jin 10/7: 기본 무제한, 300g 요청 때만
       setC(r, "수량", q.bbq ? q.people : "—");
@@ -258,7 +268,8 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
     } else if (isHall(kind) && !hallDone) {
       hallDone = true;
       setC(r, "서비스종류", q.hall);
-      setC(r, "내용", `${plabel.replace(" ", "")} 단독사용`);
+      // jin 10/10: 노래방을 원하면 실제 견적처럼 강당 줄에 '노래방 사용가능'
+      setC(r, "내용", `${plabel.replace(" ", "")} 단독사용` + (/노래방/.test(reqText) ? " / 노래방 사용가능" : ""));
       setC(r, "수량", 1); setC(r, "단가", "포함");
     }
   }
