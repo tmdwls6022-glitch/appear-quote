@@ -89,20 +89,20 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
   const token = await googleToken(saJson);
 
   // 1. 양식 탭 복사 → 단체명 이름으로 맨 앞에
-  const meta = await gapi(token, "GET", `${API}/${sheetId}?fields=sheets.properties(sheetId,title)`);
-  const tabs: { sheetId: number; title: string }[] = meta.sheets.map((s: any) => s.properties);
+  const meta = await gapi(token, "GET", `${API}/${sheetId}?fields=sheets.properties(sheetId,title,index)`);
+  const tabs: { sheetId: number; title: string; index: number }[] = meta.sheets.map((s: any) => s.properties);
+  // jin 10/10: 새 견적 탭은 양식 탭들 바로 뒤('※ 워크샵' 다음)에 차곡차곡. 그 탭이 없으면 맨 앞
+  const anchor = tabs.find((t) => /워크[샵삽숍]/.test(t.title) && !/복습/.test(t.title));   // 견적서6 탭 이름은 '※ 워크삽(워크샵)' 꼴
+  const newIndex = anchor ? (anchor.index ?? 0) + 1 : 0;
   const names: string[] = q.tplKey === "TEMPLATES.당일" ? CFG.TEMPLATES["당일"] : CFG.TEMPLATES[q.tplKey];
   const tpl = names.map((n) => tabs.find((t) => t.title === n)).find(Boolean);
   if (!tpl) throw new Error(`양식 탭을 못 찾음: ${names.join(", ")}`);
   let title = q.org, n = 2;
-  while (tabs.some((t) => t.title === title)) title = `${q.org} ${n++}`;
-  // jin 10/10: 새 견적 탭은 '※ 워크샵' 양식 탭 바로 뒤에 차곡차곡 (그 뒤부터 예전 견적들). 못 찾으면 맨 앞
-  const wsIdx = tabs.findIndex((t) => /^※\s*워크[샵숍]/.test(t.title));
-  const insertAt = wsIdx >= 0 ? wsIdx + 1 : 0;
+  while (tabs.some((t) => t.title === title)) title = `${q.org} ${n++}`;   // jin 10/10: 탭 이름에 ( ) 붙이지 않음
   const copied = await gapi(token, "POST", `${API}/${sheetId}/sheets/${tpl.sheetId}:copyTo`, { destinationSpreadsheetId: sheetId });
   const gid: number = copied.sheetId;
   await gapi(token, "POST", `${API}/${sheetId}:batchUpdate`, { requests: [
-    { updateSheetProperties: { properties: { sheetId: gid, title, index: insertAt }, fields: "title,index" } },
+    { updateSheetProperties: { properties: { sheetId: gid, title, index: newIndex }, fields: "title,index" } },
   ] });
 
   // 1-1. 필요 없는 줄 지우기 — jin 10/7
@@ -274,6 +274,9 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
       // jin 10/10: 노래방을 원하면 실제 견적처럼 강당 줄에 '노래방 사용가능'
       setC(r, "내용", `${plabel.replace(" ", "")} 단독사용` + (/노래방/.test(reqText) ? " / 노래방 사용가능" : ""));
       setC(r, "수량", 1); setC(r, "단가", "포함");
+      // jin 10/10: '당일' 양식은 강당 줄 세액·합계에 수식이 따로 있어 단가가 '포함'이면 #VALUE! → 비움
+      if (hasFormula("세액")) setC(r, "세액", "");
+      if (hasFormula("합계")) setC(r, "합계", "");
     }
   }
   extras.forEach((h, i) => {
