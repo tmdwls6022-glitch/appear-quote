@@ -76,6 +76,15 @@ function hasWeekendNight_(checkin, nights) {
   return false;
 }
 
+// jin 10/10: 단체명이 '산악회·가족모임·모임·동창회'처럼 행사 이름뿐이면 'ooo님 산악회'로 (시트 탭·단체명 칸)
+var EVENT_ONLY_RE_ = /^(산악회|가족\s*모임|가족\s*여행|모임|친목\s*모임|친목회|동창회|동문회|동호회|향우회|계모임|친구\s*모임|야유회|워크숍|워크샵|MT|엠티)$/i;
+function eventOrg_(org, contact) {
+  var o = String(org || '').trim();
+  if (!o) return contact ? String(contact).trim() + '님 단체' : '단체명 미정';
+  if (contact && EVENT_ONLY_RE_.test(o)) return String(contact).trim().replace(/님$/, '') + '님 ' + o;
+  return o;
+}
+
 function buildQuote_(r) {
   var flags = (r.unsure || []).slice();
   var nights = r.nights;
@@ -135,12 +144,8 @@ function buildQuote_(r) {
   var days = Math.max(1, nights); // 강당 대관 "하루" = 박 수
   var vat = !!r.vatDoc || type === 'company' || type === 'agency';   // jin 10/7: 대학원·사이버대·야간대(adultuniv)는 회사 단가지만 부가세 없음·기본 계좌
 
-  // jin 10/10: 산악회·가족모임·모임·동창회처럼 행사 이름으로 오면 단체명/탭 이름을 'ooo님 산악회' 꼴로
-  var orgName = r.org || '단체명 미정', who = String(r.contact || '').replace(/\s*님$/, '').trim();
-  if (who && /산악회|가족\s*모임|모임|동창회/.test(orgName) && orgName.indexOf(who) < 0) orgName = who + '님 ' + orgName;
-
   return {
-    org: orgName, contact: r.contact || '', phone: r.phone || '',
+    org: eventOrg_(r.org, r.contact), contact: r.contact || '', phone: r.phone || '',
     adults: adults, kids: kids, people: people, period: period, nights: nights, days: days,
     checkin: r.checkin || null, checkout: r.checkout || null, scheduleText: r.scheduleText || '',
     type: type, unit: unit, tplKey: tpl, pkgName: pkgName, bbq: bbq, vat: vat,
@@ -279,4 +284,4 @@ function pensionText_(list) {
   return out.join('\n');
 }
 
-export { isPeak_, roomOptions_, periodName_, periodLabel_, hasWeekendNight_, buildQuote_, smallestHallFor_, hallInfo_, assignRooms_, priceTotals_, busyFromBookings_, scheduleLine_, pensionText_ };
+export { eventOrg_, isPeak_, roomOptions_, periodName_, periodLabel_, hasWeekendNight_, buildQuote_, smallestHallFor_, hallInfo_, assignRooms_, priceTotals_, busyFromBookings_, scheduleLine_, pensionText_ };
