@@ -103,3 +103,11 @@ console.log("rooms.test 통과");
   assert.equal(f(270), false); assert.equal(f(273), true);
   console.log("rooms.test 10 통과");
 }
+{ // jin 10/10: 행사 이름(산악회 등)은 'ooo님 산악회'
+  const { buildQuote_ } = await import('../kakao-quote/core.js');
+  const a = buildQuote_({ org: '산악회', contact: '이철로', nights: 0, adults: 40, checkin: '2026-10-18' });
+  const b = buildQuote_({ org: '관악감리교회', contact: '홍길동', nights: 1, adults: 25, checkin: '2027-01-22', customerType: 'church' });
+  const c = buildQuote_({ org: '이철로님 산악회', contact: '이철로 님', nights: 0, adults: 40, checkin: '2026-10-18' });
+  if (a.org !== '이철로님 산악회' || b.org !== '관악감리교회' || c.org !== '이철로님 산악회') throw new Error('행사명 탭 이름 실패 ' + a.org + '|' + b.org + '|' + c.org);
+  console.log('행사명 탭 이름 통과');
+}

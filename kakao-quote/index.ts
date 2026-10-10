@@ -27,7 +27,7 @@ import { parseEdit_, applyAdjust_, describe_, diff_ } from "./adjust.js";
 import { pdfToPng } from "./image.ts";
 import { startMock, runMock, mockSummary } from "./mock.ts";
 
-const DEFAULT_SHEET = "1Ir02b_-zNbLCUkemxEG0yM63DCUJShUwhY0D_RkcDm0"; // 자동화 복습(테스트 시트)
+const DEFAULT_SHEET = "1jmlceIpCU5RShica6mWc8iR5sZRb5DwVpyQ5U1he8Bw"; // jin 10/10: '🔥어피어 견적서6 (26.7.29~)'로 옮김 (예전 테스트 시트 '자동화 복습' = 1Ir02b_-zNbLCUkemxEG0yM63DCUJShUwhY0D_RkcDm0)
 
 const NOTION_DS = "1cf33639-fc7f-80e9-8abd-000bf8bbb0d0"; // DB_인입콜
 const NOTION_VERSION = "2025-09-03";

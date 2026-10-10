@@ -135,8 +135,12 @@ function buildQuote_(r) {
   var days = Math.max(1, nights); // 강당 대관 "하루" = 박 수
   var vat = !!r.vatDoc || type === 'company' || type === 'agency';   // jin 10/7: 대학원·사이버대·야간대(adultuniv)는 회사 단가지만 부가세 없음·기본 계좌
 
+  // jin 10/10: 산악회·가족모임·모임·동창회처럼 행사 이름으로 오면 단체명/탭 이름을 'ooo님 산악회' 꼴로
+  var orgName = r.org || '단체명 미정', who = String(r.contact || '').replace(/\s*님$/, '').trim();
+  if (who && /산악회|가족\s*모임|모임|동창회/.test(orgName) && orgName.indexOf(who) < 0) orgName = who + '님 ' + orgName;
+
   return {
-    org: r.org || '단체명 미정', contact: r.contact || '', phone: r.phone || '',
+    org: orgName, contact: r.contact || '', phone: r.phone || '',
     adults: adults, kids: kids, people: people, period: period, nights: nights, days: days,
     checkin: r.checkin || null, checkout: r.checkout || null, scheduleText: r.scheduleText || '',
     type: type, unit: unit, tplKey: tpl, pkgName: pkgName, bbq: bbq, vat: vat,
