@@ -95,7 +95,7 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
   const tpl = names.map((n) => tabs.find((t) => t.title === n)).find(Boolean);
   if (!tpl) throw new Error(`양식 탭을 못 찾음: ${names.join(", ")}`);
   let title = q.org, n = 2;
-  while (tabs.some((t) => t.title === title)) title = `${q.org} (${n++})`;
+  while (tabs.some((t) => t.title === title)) title = `${q.org} ${n++}`;   // jin 10/10: 탭 이름에 ( ) 붙이지 않음
   const copied = await gapi(token, "POST", `${API}/${sheetId}/sheets/${tpl.sheetId}:copyTo`, { destinationSpreadsheetId: sheetId });
   const gid: number = copied.sheetId;
   await gapi(token, "POST", `${API}/${sheetId}:batchUpdate`, { requests: [

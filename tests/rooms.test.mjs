@@ -103,3 +103,12 @@ console.log("rooms.test 통과");
   assert.equal(f(270), false); assert.equal(f(273), true);
   console.log("rooms.test 10 통과");
 }
+{ // jin 10/10: 행사 이름뿐인 단체명은 'ooo님 산악회'
+  const { eventOrg_ } = await import('../kakao-quote/core.js');
+  const eq = (a, b) => { if (a !== b) throw new Error(a + ' != ' + b); };
+  eq(eventOrg_('산악회', '이철로'), '이철로님 산악회');
+  eq(eventOrg_('가족 모임', '김OO님'), '김OO님 가족 모임');
+  eq(eventOrg_('관악감리교회', '박하늘'), '관악감리교회');
+  eq(eventOrg_('동창회', ''), '동창회');
+  console.log('행사 이름 단체명 통과');
+}
