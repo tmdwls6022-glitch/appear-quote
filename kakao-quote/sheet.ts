@@ -253,6 +253,8 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
       if (!q.roomOptions && /옵션/.test(kind)) { setC(r, "서비스종류", "객실"); setC(r, "비고", ""); }   // 옵션 1을 지운 뒤 남은 '객실옵션 2' → '객실'
       setC(r, "내용", `${q.twin ? "2인1실" : "3인1실"} 온돌룸 (본관동)`);
       setC(r, "수량", rooms); setC(r, "단가", "포함");
+      // jin 10/10: 객실 줄의 초록색은 '펜션/온돌 두 가지 중 선택'일 때만 — 옵션이 하나뿐이면 색을 뺀다
+      if (!q.roomOptions) for (let c = 0; c < 11; c++) marks.push({ row: r, col: c, note: "", color: "#ffffff" });
     } else if (isHall(kind) && !hallDone) {
       hallDone = true;
       setC(r, "서비스종류", q.hall);
