@@ -81,12 +81,13 @@ console.log("rooms.test 통과");
   assert.ok(w.q.flags.some((f) => /150만/.test(f)));
   console.log("rooms.test 8 통과");
 }
-{ // jin 10/7: 1~2월 금토일 1박2일 +1만
+{ // jin 10/10: 1~2월 금토일 1박2일도 7.5만 (+1만은 7~8월만)
   const { buildQuote_ } = await import('../kakao-quote/core.js');
   const fri = buildQuote_({ checkin: '2027-01-08', nights: 1, adults: 30, customerType: 'church' });
   const tue = buildQuote_({ checkin: '2027-01-05', nights: 1, adults: 30, customerType: 'church' });
-  if (fri.unit !== 85000 || tue.unit !== 75000) throw new Error('1~2월 금토일 +1만 실패 ' + fri.unit + ' ' + tue.unit);
-  console.log('1~2월 금토일 통과');
+  const jul = buildQuote_({ checkin: '2027-07-09', nights: 1, adults: 30, customerType: 'church' });
+  if (fri.unit !== 75000 || tue.unit !== 75000 || jul.unit !== 85000) throw new Error('1박2일 단가 실패 ' + fri.unit + ' ' + tue.unit + ' ' + jul.unit);
+  console.log('1~2월 금토일 7.5만 통과');
 }
 { // 9. 성수기: 1~2월 금토일·공휴일
   const pk = (ci, n) => run({ adults: 40, checkin: ci, nights: n, customerType: "church", wantsMainHall: true }).q.flags.some((f) => /최대 300만/.test(f));
