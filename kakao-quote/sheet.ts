@@ -89,8 +89,11 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
   const token = await googleToken(saJson);
 
   // 1. 양식 탭 복사 → 단체명 이름으로 맨 앞에
-  const meta = await gapi(token, "GET", `${API}/${sheetId}?fields=sheets.properties(sheetId,title)`);
-  const tabs: { sheetId: number; title: string }[] = meta.sheets.map((s: any) => s.properties);
+  const meta = await gapi(token, "GET", `${API}/${sheetId}?fields=sheets.properties(sheetId,title,index)`);
+  const tabs: { sheetId: number; title: string; index: number }[] = meta.sheets.map((s: any) => s.properties);
+  // jin 10/10: 새 견적 탭은 양식 탭들 바로 뒤('※ 워크샵' 다음)에 차곡차곡. 그 탭이 없으면 맨 앞
+  const anchor = tabs.find((t) => t.title === "※ 워크샵");
+  const newIndex = anchor ? (anchor.index ?? 0) + 1 : 0;
   const names: string[] = q.tplKey === "TEMPLATES.당일" ? CFG.TEMPLATES["당일"] : CFG.TEMPLATES[q.tplKey];
   const tpl = names.map((n) => tabs.find((t) => t.title === n)).find(Boolean);
   if (!tpl) throw new Error(`양식 탭을 못 찾음: ${names.join(", ")}`);
@@ -99,7 +102,7 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
   const copied = await gapi(token, "POST", `${API}/${sheetId}/sheets/${tpl.sheetId}:copyTo`, { destinationSpreadsheetId: sheetId });
   const gid: number = copied.sheetId;
   await gapi(token, "POST", `${API}/${sheetId}:batchUpdate`, { requests: [
-    { updateSheetProperties: { properties: { sheetId: gid, title, index: 0 }, fields: "title,index" } },
+    { updateSheetProperties: { properties: { sheetId: gid, title, index: newIndex }, fields: "title,index" } },
   ] });
 
   // 1-1. 필요 없는 줄 지우기 — jin 10/7
