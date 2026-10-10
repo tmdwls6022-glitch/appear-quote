@@ -208,7 +208,7 @@ function summary(q: any, t: any, url: string) {
   const lines = [
     `✅ ${q.org} 견적 탭을 만들었어요`,
     `${q.period} · ${q.checkin ? scheduleLine_(q) : "날짜 확인 필요"} · ${q.people}명`,
-    `1인 ${won(q.unit)} · ${q.hall} · ` + (q.roomOptions ? `객실 ①펜션 ${q.pensions.length ? q.pensions.join("·") : "없음"}+온돌 ${q.ondol}실 / ②온돌 ${q.ondolOnly}실` : `객실 ${q.twin ? "2인1실" : "3인1실"} 온돌 ${q.ondolOnly}실`),
+    `1인 ${won(q.unit)} · ${q.hall}` + (q.nights === 0 ? "" : " · ") + (q.nights === 0 ? "" : q.roomOptions ? `객실 ①펜션 ${q.pensions.length ? q.pensions.join("·") : "없음"}+온돌 ${q.ondol}실 / ②온돌 ${q.ondolOnly}실` : `객실 ${q.twin ? "2인1실" : "3인1실"} 온돌 ${q.ondolOnly}실`),
   ];
   for (const x of q.extraHalls ?? []) lines.push(`+ ${x.name} ${won(x.amount)}`);
   lines.push(`총 ${won(t.total)}${q.vat ? " (부가세 포함)" : ""}`);

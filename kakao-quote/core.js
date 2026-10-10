@@ -196,7 +196,7 @@ function assignRooms_(q, busy) {
 
   // 객실 — jin 10/7: 기본은 3인1실 온돌만. 객실옵션 1(펜션+온돌)·2(온돌만)는 펜션·다인실을 요청했거나,
   // 젊은 층(MT·청년부·대학부·중고등부), 친목 모임(가족·동창·동호회)일 때만.
-  q.roomOptions = roomOptions_(q);
+  q.roomOptions = q.nights > 0 && roomOptions_(q);   // 당일은 객실 없음 — 옵션·온돌 줄 확인 표시도 안 띄움 (10/10)
   var need = !q.roomOptions ? 0 : q.people < 10 ? 0 : 1;   // jin 10/7 Q17·18: 펜션은 1동만(더 필요하면 사람이 정함)
   if (q.nights === 0) { q.pensions = []; q.ondol = 0; q.ondolOnly = 0; return; }             // 당일: 숙박 없음
   q.pensionPaid = q.type === 'university' && q.period === '1박2일';      // MT: 펜션은 1동 15만 추가

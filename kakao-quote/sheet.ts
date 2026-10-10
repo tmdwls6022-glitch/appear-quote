@@ -275,7 +275,7 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
     setSum(kidRow, -CFG.KID_DISCOUNT * q.kids * (q.vat ? 1.1 : 1));
   }
   if (!pensionDone && q.pensions.length) q.flags.push(`양식에 펜션 줄이 없어 펜션 ${q.pensions.join("·")}동은 비고에 직접 적어주세요`);
-  if (!ondolDone) q.flags.push("양식에 온돌룸 줄이 없음");
+  if (!ondolDone && q.nights > 0) q.flags.push("양식에 온돌룸 줄이 없음");
 
   // 합계·계약금·잔금
   const vatTxt = q.vat ? "부가세 포함" : "부가세 제외";
