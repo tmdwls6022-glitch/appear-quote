@@ -49,7 +49,7 @@ export const CFG = {
     '1박2일': ['★여름 1박 2일', '기본 양식'],
     '2박3일': ['☆여름 2박 3일', '★여름 2박 3일'],
     long: ['★여름 3박 4일', '☆여름 2박 3일', '★여름 2박 3일'],
-    '당일': ['기본 양식', '빈 견적서 양식(래인)']   // jin 10/10: '기본 양식' 탭이 없어졌을 때 래인 양식으로
+    '당일': ['기본 양식', '빈 견적서 양식(래인)']   // jin 10/10: '기본 양식' 탭이 없으면 래인 빈 양식으로
   },
   MEALS: {
     '당일': { bbq: '포함', korean: '', total: '총 1식' },
@@ -103,7 +103,7 @@ function buildQuote_(r) {
     else if (type === 'company' || type === 'agency' || type === 'adultuniv') { unit = r.twinRoom ? CFG.PRICE['1박2일'].company2 : CFG.PRICE['1박2일'].company3; tpl = 'company'; pkgName = '바베큐 패키지'; }
     else { unit = type === 'church' ? CFG.PRICE['1박2일'].church : CFG.PRICE['1박2일'].group; tpl = '1박2일'; pkgName = '1박 2일 패키지'; }
     var companyType = type === 'company' || type === 'agency' || type === 'adultuniv';
-    // jin 10/10: 1박2일은 7~8월만 +1만 (관악감리교회 1월 금토 견적이 8.5로 나와 7.5로 고침 — 1~2월 금토일·공휴일 +1만 취소)
+    // jin 10/10: 1~2월 금·토·일 1박2일은 +1만 하지 않음(8.5 말고 7.5) — 1박2일 +1만은 7~8월만
     if (type !== 'university' && !(companyType && r.twinRoom) && (month === 7 || month === 8)) unit += CFG.PEAK_1N;   // jin 10/3: 1박2일 7~8월 +1만 (10/7: 회사 2인1실은 85,000원 그대로)
     if (r.twinRoom && (type === 'church' || type === 'group')) unit = CFG.PRICE['1박2일'].company2;   // jin 10/7: 교회·일반 1박2일 2인1실은 85,000원 고정
   } else if (period === '2박3일') {
