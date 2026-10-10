@@ -49,7 +49,7 @@ export const CFG = {
     '1박2일': ['★여름 1박 2일', '기본 양식'],
     '2박3일': ['☆여름 2박 3일', '★여름 2박 3일'],
     long: ['★여름 3박 4일', '☆여름 2박 3일', '★여름 2박 3일'],
-    '당일': ['기본 양식', '빈 견적서 양식(래인)']   // jin 10/10: '기본 양식' 탭이 없으면 래인 빈 양식으로
+    '당일': ['★여름 1박 2일', '기본 양식', '빈 견적서 양식(래인)']   // jin 10/10: 실제 당일 견적처럼 1박 양식을 복사해 한식·객실 줄을 지움
   },
   MEALS: {
     '당일': { bbq: '포함', korean: '', total: '총 1식' },
@@ -97,7 +97,8 @@ function buildQuote_(r) {
     var dw = r.checkin ? new Date(r.checkin + 'T00:00:00').getDay() : -1;
     var high = month === 7 || month === 8 || dw === 5 || dw === 6 || dw === 0;
     var dp = CFG.PRICE['당일'];
-    unit = r.bbq === false ? (high ? dp.koreanHigh : dp.korean) : (high ? dp.bbqHigh : dp.bbq); tpl = 'TEMPLATES.당일'; pkgName = '당일 패키지'; }
+    unit = r.bbq === false ? (high ? dp.koreanHigh : dp.korean) : (high ? dp.bbqHigh : dp.bbq); tpl = (type === 'company' || type === 'agency' || type === 'adultuniv') ? 'company' : 'TEMPLATES.당일';
+    pkgName = r.bbq === false ? '당일 패키지' : '바베큐 패키지'; }   // jin 10/10: 실제 당일 견적 135건 — 1박 양식에서 한식·객실 줄을 빼고 씀, 이름은 대개 '바베큐 패키지'
   else if (period === '1박2일') {
     if (type === 'university') { unit = CFG.PRICE['1박2일'].mt; tpl = 'mt'; pkgName = 'MT 패키지'; }
     else if (type === 'company' || type === 'agency' || type === 'adultuniv') { unit = r.twinRoom ? CFG.PRICE['1박2일'].company2 : CFG.PRICE['1박2일'].company3; tpl = 'company'; pkgName = '바베큐 패키지'; }
