@@ -203,6 +203,7 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
   // jin 10/7: 양식의 '객실옵션 1'(펜션+온돌)·'객실옵션 2'(온돌만). 옵션 1은 두 줄이 합친 칸이라
   // 둘째 줄(온돌)의 서비스종류가 비어 있음 → 위 줄의 옵션을 이어받는다.
   let roomOpt = 0;
+  const plainRows: number[] = [];
   const isMt = q.type === "university" && q.period === "1박2일";
   for (let r = head.row + 1; r <= endRow + extras.length + shift; r++) {
     if (r === kidRow || (hallRow2 >= 0 && r > hallRow2 && r <= hallRow2 + extras.length)) continue;
@@ -251,6 +252,7 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
       // 옵션 2(온돌만)는 전원을 온돌에, 그 밖(옵션 1·옵션 없는 양식)은 펜션에 못 들어간 사람만
       const rooms = roomOpt === 2 ? q.ondolOnly : q.ondol;
       if (!q.roomOptions && /옵션/.test(kind)) { setC(r, "서비스종류", "객실"); setC(r, "비고", ""); }   // 옵션 1을 지운 뒤 남은 '객실옵션 2' → '객실'
+      if (!q.roomOptions) plainRows.push(r);   // jin 10/10: 초록·분홍 칸은 '펜션 or 온돌' 두 가지 고를 때만. 한 가지면 색 뺌
       setC(r, "내용", `${q.twin ? "2인1실" : "3인1실"} 온돌룸 (본관동)`);
       setC(r, "수량", rooms); setC(r, "단가", "포함");
     } else if (isHall(kind) && !hallDone) {
@@ -310,7 +312,10 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
     range: { sheetId: gid, startRowIndex: m.row, endRowIndex: m.row + 1, startColumnIndex: m.col, endColumnIndex: m.col + 1 },
     rows: [{ values: [{ note: m.note || undefined, userEnteredFormat: { backgroundColor: hex(m.color), ...(m.wrap ? { wrapStrategy: "WRAP" } : {}) } }] }],
     fields: (m.note ? "note," : "") + "userEnteredFormat.backgroundColor" + (m.wrap ? ",userEnteredFormat.wrapStrategy" : ""),
-  } })) });
+  } })).concat(plainRows.map((r) => ({ repeatCell: {
+    range: { sheetId: gid, startRowIndex: r, endRowIndex: r + 1, startColumnIndex: 0, endColumnIndex: 11 },
+    cell: { userEnteredFormat: { backgroundColor: { red: 1, green: 1, blue: 1 } } }, fields: "userEnteredFormat.backgroundColor",
+  } }))) });
 
   // 견적서 부분만(A~K열, 내용 있는 마지막 줄까지) — PDF·사진 버튼이 이 범위를 쓴다. M열 메모·요청 원문은 빠짐
   let last = 0;
