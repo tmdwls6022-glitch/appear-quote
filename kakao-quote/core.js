@@ -11,7 +11,7 @@ export const CFG = {
   PRICE: {
     '당일': { bbq: 43000, korean: 30000, bbqHigh: 47000, koreanHigh: 37000 }, // jin 10/7: 평일 4.3만, 금·토·일·성수기 4.7만
     '1박2일': { church: 75000, group: 75000, company3: 75000, company2: 85000, mt: 49000 },
-    '2박3일': { uni: 108000, offWeekday: 120000, offWeekend: 130000, peak: 150000 }, // 영업방 10/2: 평일 12, 주말 13, 7~8월 패키지 15
+    '2박3일': { uni: 130000, offWeekday: 120000, offWeekend: 130000, peak: 150000 }, // 영업방 10/2: 평일 12, 주말 13, 7~8월 패키지 15
     '3박4일': { def: 185000, peak: 210000 },        // jin 10/7 Q9 '나': 실제 견적 18.5~21만이라 올림(비수기 18.5만, 7~8월 21만 — 정확한 값은 jin 확인)
     '4박5일': { def: 260000 }
   },
@@ -118,6 +118,7 @@ function buildQuote_(r) {
     if (r.twinRoom && (type === 'church' || type === 'group')) unit = CFG.PRICE['1박2일'].company2;   // jin 10/7: 교회·일반 1박2일 2인1실은 85,000원 고정
   } else if (period === '2박3일') {
     if (month === 7 || month === 8) unit = CFG.PRICE['2박3일'].peak;   // jin 10/5: 여름 대학도 일단 15만(여름 2박3일은 대개 교회) — 나중에 다시 정함
+    else if (type === 'university') unit = CFG.PRICE['2박3일'].uni;   // jin 10/11 카드: 2박3일 대학(MT 아님) 비수기 13만 (평일·주말 구분 없음)
     else unit = hasWeekendNight_(r.checkin, nights) ? CFG.PRICE['2박3일'].offWeekend : CFG.PRICE['2박3일'].offWeekday;
     if (!r.checkin) flags.push('날짜를 몰라 평일 단가 사용');
     tpl = '2박3일'; pkgName = '수련회 패키지';
@@ -133,6 +134,11 @@ function buildQuote_(r) {
     else { unit -= CFG.MEAL_DROP * skip; flags.push('식사 ' + skip + '끼 빼고 1인 ' + (CFG.MEAL_DROP * skip).toLocaleString() + '원 깎음 — 식사 문구(총 몇 식)는 직접 고쳐 주세요'); }
   }
 
+  // jin 10/11 카드: 당일·대학 MT 빼고 1인 단가를 가까운 쪽으로 끊음 — 10만원 미만 5천원, 10만원 이상 만원 단위(총액은 끊지 않고 인원×단가)
+  if (period !== '당일' && !(period === '1박2일' && type === 'university')) {
+    var step = unit >= 100000 ? 10000 : 5000, rounded = Math.round(unit / step) * step;
+    if (rounded !== unit) { flags.push('1인 단가 ' + unit.toLocaleString() + '원 → ' + rounded.toLocaleString() + '원(' + (step / 1000) + '천원 단위로 맞춤)'); unit = rounded; }
+  }
   if (Number(r.unitOverride) > 0) {   // jin 10/5: 조정장치 — 사람이 1인 단가를 직접 정함
     flags.push('1인 단가를 직접 ' + Number(r.unitOverride).toLocaleString() + '원으로 정함(자동 계산 ' + unit.toLocaleString() + '원)');
     unit = Number(r.unitOverride);
@@ -176,7 +182,7 @@ function assignRooms_(q, busy) {
   if (!hall) { hall = want; q.flags.push(want + ' 이후 큰 강당이 모두 예약돼 있음 — 확인 필요'); }
   else if (hall !== want) q.flags.push(want + '이(가) 예약돼 있어 ' + hall + '(으)로 배정');
   q.hall = hall;
-  if ((hall === '2강당' || hall === '3강당') && !busy.halls['2강당'] && !busy.halls['3강당']) q.hall = '2강당 OR 3강당';   // jin 10/7
+  // jin 10/11 카드: 2·3강당은 'OR' 로 적지 않고 비는 쪽 하나로 정해 적음 (이전 10/7 규칙 대체)
 
   // 추가 강당 (4강당 이하 단체가 대강당 원하면 추가 대관으로)
   q.extraHalls = [];

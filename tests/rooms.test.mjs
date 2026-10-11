@@ -68,13 +68,13 @@ assert.equal(run({ adults: 30, checkin: "2026-11-13", nights: 2, customerType: "
 assert.throws(() => run({ adults: 30, checkin: "2026-11-13", nights: 4, customerType: "church" }), /직접 정함/);
 r = run({ adults: 30, kids: 5, checkin: "2026-11-13", nights: 1, customerType: "church" });
 assert.equal(r.t.kidDisc, 0); assert.ok(r.q.flags.some((f) => /초등 이하/.test(f)));
-assert.equal(run({ adults: 30, checkin: "2026-11-13", nights: 1, customerType: "church" }).q.hall, "2강당 OR 3강당");
+assert.equal(run({ adults: 30, checkin: "2026-11-13", nights: 1, customerType: "church" }).q.hall, "2강당");
 assert.equal(run({ adults: 30, checkin: "2026-11-13", nights: 1, customerType: "church", twinRoom: false }).q.flags.some((f) => /250|특가/.test(f)), false);
 console.log("rooms.test 통과");
 // 8. jin 10/7: BBQ 300g −4천, 당일 평일 4.3만·금토일 4.7만, 겨울 주말 대강당 확인
 {
   const a = run({ adults: 40, checkin: "2026-11-13", nights: 1, customerType: "church", bbq300: true });
-  assert.equal(a.q.unit, 71000); assert.equal(a.q.bbq300, true);
+  assert.equal(a.q.unit, 70000); assert.equal(a.q.bbq300, true);
   assert.equal(run({ adults: 40, checkin: "2026-11-11", nights: 0, customerType: "company" }).q.unit, 43000);   // 수
   assert.equal(run({ adults: 40, checkin: "2026-11-14", nights: 0, customerType: "company" }).q.unit, 47000);   // 토
   const w = run({ adults: 40, checkin: "2027-01-22", nights: 2, customerType: "church", wantsMainHall: true });
@@ -110,4 +110,16 @@ console.log("rooms.test 통과");
   const c = buildQuote_({ org: '이철로님 산악회', contact: '이철로 님', nights: 0, adults: 40, checkin: '2026-10-18' });
   if (a.org !== '이철로님 산악회' || b.org !== '관악감리교회' || c.org !== '이철로님 산악회') throw new Error('행사명 탭 이름 실패 ' + a.org + '|' + b.org + '|' + c.org);
   console.log('행사명 탭 이름 통과');
+}
+
+// jin 10/11 카드: 1인 단가 가까운 쪽 끊기(10만 미만 5천·이상 만원), 당일·MT 제외, 2박3일 대학 13만
+{
+  const a = run({ adults: 30, checkin: "2026-11-10", nights: 1, customerType: "company", bbq300: true });
+  assert.equal(a.q.unit, 70000, "7.5만−4천=71,000 → 7만");
+  const b = run({ adults: 30, checkin: "2026-11-10", nights: 2, customerType: "university" });
+  assert.equal(b.q.unit, 130000, "2박3일 대학 13만");
+  const c = run({ adults: 30, checkin: "2026-11-10", nights: 0, customerType: "company" });
+  assert.ok([43000, 47000].includes(c.q.unit), "당일은 끊지 않음");
+  const d = run({ adults: 30, checkin: "2026-11-10", nights: 1, customerType: "university" });
+  assert.equal(d.q.unit, 49000, "MT 는 끊지 않음");
 }
