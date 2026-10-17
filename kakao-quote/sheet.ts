@@ -83,6 +83,15 @@ function rightOf(g: Grid, cell: { row: number; col: number }) {
   return { row: cell.row, col: m ? m.endColumnIndex : cell.col + 1 };
 }
 
+// jin 10/18: 시험 견적 탭 한꺼번에 지우기 — 이름이 prefix 로 시작하는 탭만
+export async function deleteTabs(sheetId: string, saJson: string, prefix: string) {
+  const token = await googleToken(saJson);
+  const meta = await gapi(token, "GET", `${API}/${sheetId}?fields=sheets.properties(sheetId,title)`);
+  const del = meta.sheets.map((s: any) => s.properties).filter((t: any) => String(t.title).startsWith(prefix));
+  if (del.length) await gapi(token, "POST", `${API}/${sheetId}:batchUpdate`, { requests: del.map((t: any) => ({ deleteSheet: { sheetId: t.sheetId } })) });
+  return del.length;
+}
+
 // ───────── 본체 ─────────
 // req: Gemini 가 읽은 요청(조정표에 씀). replaceGid: 수정으로 다시 만들 때 지울 예전 탭
 export async function writeQuote(q: any, reqText: string, sheetId: string, saJson: string, req: any = null, replaceGid: number | null = null) {

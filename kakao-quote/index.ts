@@ -11,6 +11,7 @@
 //   수정: 인원 60, 단가 80000 … : 마지막 견적을 고쳐 다시 계산 (adjust.js, Gemini 안 부름)
 //   다시            : 시트 탭 오른쪽 '조정표'(N열)에서 고친 값으로 다시 계산
 //   목록            : 노션 인입콜에서 자동으로 만든 견적 초안 목록 (jin 10/17)
+//   시험견적: <요청 글> : 견적:과 같지만 탭 이름 앞에 '🧪시험' — 잘 만드는지 볼 때. 시험지우기 : 그 탭들 한꺼번에 지움 (jin 10/18)
 //   결과#번호 / 수정#번호: … / 다시#번호 : 목록의 그 견적을 보기·고치기 (번호 없으면 내 마지막 견적)
 // 자동 시작 (jin 10/17, auto.js): POST {"auto":"inbound"} — 예약 작업(db/auto_cron.sql)이 10분마다 부른다.
 //   DB_인입콜에 '어피어연수원 견적' 카드가 새로 생기면 견적 탭을 만들고 그 카드에 댓글로 알린다. 고객 발송은 사람이.
@@ -26,7 +27,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { buildQuote_, assignRooms_, busyFromBookings_, scheduleLine_ } from "./core.js";
 import { CFG } from "./core.js";
-import { writeQuote, exportPdf, readAdjust } from "./sheet.ts";
+import { writeQuote, exportPdf, readAdjust, deleteTabs } from "./sheet.ts";
 import { parseEdit_, applyAdjust_, describe_, diff_ } from "./adjust.js";
 import { pdfToPng } from "./image.ts";
 import { startMock, runMock, mockSummary } from "./mock.ts";
@@ -74,6 +75,7 @@ const HELP = [
   "· 결과 : 마지막 견적 다시 보기",
   "· 수정: 인원 60, 단가 80000, 바베큐 빼기 : 마지막 견적 고치기",
   "· 다시 : 시트 조정표(N열)를 고친 뒤 다시 계산",
+  "· 시험견적: (요청 글) : 탭 이름 앞에 🧪시험 / 시험지우기 : 그 탭들 지움",
   "· 목록 : 노션 인입콜에서 자동으로 만든 견적 초안 (결과#번호 · 수정#번호: … · 다시#번호)",
   "· 모의 / 모의결과 : 견적 읽기 정확도 시험",
   "· 직원등록 이름 : 처음 한 번",
@@ -225,9 +227,11 @@ function summary(q: any, t: any, url: string) {
 }
 
 // adj: 수정·다시 명령일 때 — 고친 req 와 지울 예전 탭(gid). 이때는 Gemini 를 다시 부르지 않는다
-async function makeQuote(text: string, adj: { req: any; replaceGid: number | null; note: string } | null = null, asof?: string) {
+const TEST_TAG = "🧪시험 ";
+async function makeQuote(text: string, adj: { req: any; replaceGid: number | null; note: string; test?: boolean } | null = null, asof?: string, test = false) {
   const req = adj ? adj.req : await parseRequest(text, asof);
   const q: any = buildQuote_(req);
+  if (test || adj?.test) q.org = TEST_TAG + q.org;   // jin 10/18: 시험 탭은 이름으로 구분(시험지우기로 한꺼번에 지움)
   let bookings: any[] = [];
   if (q.checkin) {
     try { bookings = await notionBookings(q.checkin, q.checkout); }
@@ -243,11 +247,11 @@ async function makeQuote(text: string, adj: { req: any; replaceGid: number | nul
 }
 
 // ───────── 작업 실행 (콜백 또는 기록) ─────────
-async function runJob(userKey: string, text: string, callbackUrl: string | null, adj: { req: any; replaceGid: number | null; note: string } | null = null, asof?: string) {
+async function runJob(userKey: string, text: string, callbackUrl: string | null, adj: { req: any; replaceGid: number | null; note: string; test?: boolean } | null = null, asof?: string, test = false) {
   const sb = db();
   const { data: job } = await sb.from("quote_bot_jobs").insert({ user_key: userKey, request: text }).select("id").single();
   let reply: string, status = "done", result: unknown = null;
-  try { ({ reply, result } = await makeQuote(text, adj, asof)); }
+  try { ({ reply, result } = await makeQuote(text, adj, asof, test)); }
   catch (e) { status = "error"; reply = `⚠️ 견적을 못 만들었어요: ${(e as Error).message}`; }
   if (job) await sb.from("quote_bot_jobs").update({ status, reply, result, finished_at: new Date().toISOString() }).eq("id", job.id);
   if (callbackUrl) {
@@ -381,12 +385,24 @@ Deno.serve(async (req) => {
   const edit = utter.match(/^수정\s*(?:#\s*(\d+))?\s*[:：]?\s*([\s\S]+)$/);
   const redo = utter.match(/^다시\s*(?:#\s*(\d+))?$/);
   const list = /^목록$/.test(utter);
-  if (!m && !isResult && !mock && !edit && !redo && !list) return json(kakaoText(HELP));
+  const testQ = utter.match(/^시험\s*견적\s*[:：]?\s*([\s\S]+)$/);
+  const testDel = /^시험\s*지우기$/.test(utter);
+  if (!m && !isResult && !mock && !edit && !redo && !list && !testQ && !testDel) return json(kakaoText(HELP));
 
   const { data: u } = await sb.from("quote_bot_users").select("approved").eq("user_key", userKey).maybeSingle();
   if (!u?.approved) return json(kakaoText('직원용 기능이에요. 처음이면 "직원등록 이름"을 보내 주세요.'));
 
   if (list) return json(kakaoText(await autoList(sb)));
+  if (testDel) {
+    try { return json(kakaoText(`🧪 시험 탭 ${await deleteTabs(env("QUOTE_SHEET_ID") || DEFAULT_SHEET, env("GOOGLE_SA_JSON"), TEST_TAG.trim())}개를 지웠어요.`)); }
+    catch (e) { return json(kakaoText(`⚠️ ${(e as Error).message}`)); }
+  }
+  if (testQ) {
+    // @ts-ignore EdgeRuntime는 Supabase 런타임 전역
+    EdgeRuntime.waitUntil(runJob(userKey, testQ[1].trim(), callbackUrl, null, undefined, true));
+    if (callbackUrl) return json({ version: "2.0", useCallback: true, data: { text: "🧪 시험 견적 쓰는 중이에요. 30초쯤 걸려요." } });
+    return json(kakaoText("🧪 시험 견적 쓰는 중이에요. 30초 뒤 '결과'라고 보내 주세요."));
+  }
 
   // 번호(#N)가 있으면 그 견적(내 것 또는 자동 견적), 없으면 내 마지막 견적
   const pickJob = async (id: string | undefined, onlyDone: boolean) => {
@@ -420,7 +436,7 @@ Deno.serve(async (req) => {
     const note = describe_(set) + (bad.length ? ` (못 알아들은 것: ${bad.join(", ")})` : "");
     // @ts-ignore EdgeRuntime는 Supabase 런타임 전역
     // 고친 견적도 원래 주인(자동 견적이면 자동 쪽)에 남겨 목록·다음 수정이 이어지게. 답장은 고친 직원에게
-    EdgeRuntime.waitUntil(runJob(last!.user_key, last!.request, callbackUrl, { req: applyAdjust_(r.req, set), replaceGid: r.gid ?? null, note }));
+    EdgeRuntime.waitUntil(runJob(last!.user_key, last!.request, callbackUrl, { req: applyAdjust_(r.req, set), replaceGid: r.gid ?? null, note, test: String(r.title ?? "").startsWith(TEST_TAG.trim()) }));
     if (callbackUrl) return json({ version: "2.0", useCallback: true, data: { text: `고쳐서 다시 계산하는 중이에요: ${note}` } });
     return json(kakaoText(`고쳐서 다시 계산하는 중이에요: ${note}\n20초 뒤 ${last!.user_key === AUTO_USER ? "'목록'" : "'결과'"}을 보내 주세요.`));
   }
