@@ -9,9 +9,12 @@
 
 고객에게 자동 발송하지 않습니다. 노란 칸과 M3 메모는 사람이 확인할 곳입니다.
 
+> 처음이면 `docs/견적_인계.md` 부터. 견적 코드 정본은 이 저장소 하나(10/17).
+
 ## 카톡 채널 챗봇 (kakao-quote) — Apps Script 없이 동작
 - `kakao-quote/`: Supabase Edge Function. 프로젝트 "room arrange"(ykujzljgaxtbwawuwoff)에 배포되어 있음.
   - 스킬 URL: https://ykujzljgaxtbwawuwoff.supabase.co/functions/v1/kakao-quote
+- 자동 시작(10/17): 노션 DB_인입콜 '어피어연수원 견적' 새 카드 → `auto.js` → 견적 탭 + 카드 댓글 (카톡 "목록"). `db/auto_cron.sql` 이 10분마다 부름.
 - 흐름: 카카오 오픈빌더 스킬 → `index.ts`(Gemini로 요청 읽기, 노션 예약 확인) → `core.js`(가격 계산) → `sheet.ts`(Sheets API로 양식 탭 복사·칸 채우기) → 카톡 답장.
 - Supabase 비밀값(jin 직접 입력): `GEMINI_API_KEY`, `NOTION_TOKEN`, `GOOGLE_SA_JSON`(서비스 계정 키). 선택: `QUOTE_SHEET_ID`(기본은 '자동화 복습').
 - 견적 시트는 서비스 계정 이메일에 편집자로 공유해야 함.
