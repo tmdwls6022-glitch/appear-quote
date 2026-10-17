@@ -40,8 +40,8 @@ const pages = [
   card("gggg", "2026-10-18T08:00:00.000Z"),
 ];
 const picked = pickNew_(pages, ["ffff"]).map((p) => p.id);
-assert.equal(AUTO_PER_RUN, 2);
-assert.deepEqual(picked, ["bbbb", "gggg"]);
+assert.equal(AUTO_PER_RUN, 1);
+assert.deepEqual(picked, ["bbbb"]);
 assert.equal(marker_("ab-cd"), "[노션 abcd]");
 
 console.log("auto.test 통과");

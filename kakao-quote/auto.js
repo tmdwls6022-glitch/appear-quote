@@ -7,7 +7,7 @@ export const AUTO_USER = 'auto:notion';      // quote_bot_jobs.user_key — 자�
 export const AUTO_STATUS = '어피어연수원 견적'; // DB_인입콜 '상태'(다중 선택)에 이 값이 있는 카드만
 export const AUTO_FROM = '2026-10-18';        // 이 날(KST) 이후 생긴 카드만. 예전 카드 수백 장을 한꺼번에 만들지 않게
 export const AUTO_LOOKBACK_DAYS = 3;          // 최근 며칠 카드까지 볼지(놓친 것 다시 잡기)
-export const AUTO_PER_RUN = 2;                // 한 번 깨울 때 만들 개수 — 함수 시간 한도(1건 30초쯤) 안에서, 한 건씩 차례로
+export const AUTO_PER_RUN = 1;                // 한 번 깨울 때 만들 개수 — 10/18 첫 운영 시험에서 1건 67초 걸려 2건이면 함수 시간 한도(150초)에 닿음. 10분마다 1건 = 하루 80건 넘게 처리(들어오는 건 하루 6장꼴)
 
 // 노션 속성 → 글자
 function txt(p) {
