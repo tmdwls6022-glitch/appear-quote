@@ -27,7 +27,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { buildQuote_, assignRooms_, busyFromBookings_, scheduleLine_ } from "./core.js";
 import { CFG } from "./core.js";
-import { writeQuote, exportPdf, readAdjust, deleteTabs } from "./sheet.ts";
+import { writeQuote, exportPdf, readAdjust, deleteTabs, templateTabs } from "./sheet.ts";
 import { parseEdit_, applyAdjust_, describe_, diff_ } from "./adjust.js";
 import { pdfToPng } from "./image.ts";
 import { startMock, runMock, mockSummary } from "./mock.ts";
@@ -387,12 +387,17 @@ Deno.serve(async (req) => {
   const list = /^목록$/.test(utter);
   const testQ = utter.match(/^시험\s*견적\s*[:：]?\s*([\s\S]+)$/);
   const testDel = /^시험\s*지우기$/.test(utter);
-  if (!m && !isResult && !mock && !edit && !redo && !list && !testQ && !testDel) return json(kakaoText(HELP));
+  const tplList = /^양식\s*목록$/.test(utter);
+  if (!m && !isResult && !mock && !edit && !redo && !list && !testQ && !testDel && !tplList) return json(kakaoText(HELP));
 
   const { data: u } = await sb.from("quote_bot_users").select("approved").eq("user_key", userKey).maybeSingle();
   if (!u?.approved) return json(kakaoText('직원용 기능이에요. 처음이면 "직원등록 이름"을 보내 주세요.'));
 
   if (list) return json(kakaoText(await autoList(sb)));
+  if (tplList) {   // jin 10/18: 견적서6 양식 탭 이름 확인(2박·3박 양식을 못 찾아 실패)
+    try { return json(kakaoText((await templateTabs(env("QUOTE_SHEET_ID") || DEFAULT_SHEET, env("GOOGLE_SA_JSON"))).join("\n") || "양식 탭이 없어요")); }
+    catch (e) { return json(kakaoText(`⚠️ ${(e as Error).message}`)); }
+  }
   if (testDel) {
     try { return json(kakaoText(`🧪 시험 탭 ${await deleteTabs(env("QUOTE_SHEET_ID") || DEFAULT_SHEET, env("GOOGLE_SA_JSON"), TEST_TAG.trim())}개를 지웠어요.`)); }
     catch (e) { return json(kakaoText(`⚠️ ${(e as Error).message}`)); }

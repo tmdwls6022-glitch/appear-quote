@@ -92,6 +92,14 @@ export async function deleteTabs(sheetId: string, saJson: string, prefix: string
   return del.length;
 }
 
+// jin 10/18: 양식 탭 이름 확인용 — 고객 탭(단체명)은 빼고 기호·'양식'이 든 탭만
+export async function templateTabs(sheetId: string, saJson: string) {
+  const token = await googleToken(saJson);
+  const meta = await gapi(token, "GET", `${API}/${sheetId}?fields=sheets.properties(title,index)`);
+  return meta.sheets.map((s: any) => s.properties).filter((t: any) => /[★☆※#＃]|양식|^MT$/.test(String(t.title)))
+    .map((t: any) => `${t.index}: ${t.title}`);
+}
+
 // ───────── 본체 ─────────
 // req: Gemini 가 읽은 요청(조정표에 씀). replaceGid: 수정으로 다시 만들 때 지울 예전 탭
 export async function writeQuote(q: any, reqText: string, sheetId: string, saJson: string, req: any = null, replaceGid: number | null = null) {
