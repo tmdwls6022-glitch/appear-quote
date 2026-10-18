@@ -22,7 +22,7 @@
 //
 // 비밀값 (Supabase → Edge Functions → Secrets, jin이 직접 입력)
 //   GEMINI_API_KEY, NOTION_TOKEN, GOOGLE_SA_JSON(구글 서비스 계정 키 JSON)
-//   QUOTE_SHEET_ID(선택, 없으면 테스트 시트 '자동화 복습')
+//   (QUOTE_SHEET_ID 는 10/18부터 안 씀 — 시트는 코드의 QUOTE_SHEET)
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { buildQuote_, assignRooms_, busyFromBookings_, scheduleLine_ } from "./core.js";
@@ -33,7 +33,10 @@ import { pdfToPng } from "./image.ts";
 import { startMock, runMock, mockSummary } from "./mock.ts";
 import { AUTO_USER, AUTO_STATUS, AUTO_LOOKBACK_DAYS, inboundText_, asofKst_, pickNew_, pageIdOf_, commentText_ } from "./auto.js";
 
-const DEFAULT_SHEET = "1jmlceIpCU5RShica6mWc8iR5sZRb5DwVpyQ5U1he8Bw"; // jin 10/10: '🔥어피어 견적서6 (26.7.29~)' (예전 테스트 시트 '자동화 복습' = 1Ir02b_-zNbLCUkemxEG0yM63DCUJShUwhY0D_RkcDm0)
+// jin 10/18: 봇 견적은 '자동화 복습'(견적서6 지금 양식 5개만 남긴 가벼운 시트)에 만든다. 실제 견적서6(1jmlceIpCU5RShica6mWc8iR5sZRb5DwVpyQ5U1he8Bw)엔 탭을 만들지 않음.
+//   정리 전 사본: '자동화 복습 (백업 2026-10-18, 탭 정리 전)' 1wty8YnpCCGwtnscRbG14z4SMSHecmg3xB16zycb5nqs.
+//   시트 주소는 여기 한 곳만 본다(비밀값 QUOTE_SHEET_ID 는 10/10 견적서6 값이 남아 있어 더는 읽지 않음)
+const QUOTE_SHEET = "1Ir02b_-zNbLCUkemxEG0yM63DCUJShUwhY0D_RkcDm0";
 
 const NOTION_DS = "1cf33639-fc7f-80e9-8abd-000bf8bbb0d0"; // DB_인입콜
 const NOTION_VERSION = "2025-09-03";
@@ -240,7 +243,7 @@ async function makeQuote(text: string, adj: { req: any; replaceGid: number | nul
   assignRooms_(q, busyFromBookings_(bookings));
   const sa = env("GOOGLE_SA_JSON");
   if (!sa) throw new Error("GOOGLE_SA_JSON 없음");
-  const w = await writeQuote(q, text, env("QUOTE_SHEET_ID") || DEFAULT_SHEET, sa, req, adj?.replaceGid ?? null);
+  const w = await writeQuote(q, text, QUOTE_SHEET, sa, req, adj?.replaceGid ?? null);
   const reply = (adj ? `✏️ 수정 반영: ${adj.note}\n` : "") + summary(q, w.totals, w.url);
   return { reply, result: { title: w.title, url: w.url, q, t: w.totals, req,
     sheetId: w.sheetId, gid: w.gid, range: w.range, share: crypto.randomUUID().replace(/-/g, "") } };
@@ -395,11 +398,11 @@ Deno.serve(async (req) => {
 
   if (list) return json(kakaoText(await autoList(sb)));
   if (tplList) {   // jin 10/18: 견적서6 양식 탭 이름 확인(2박·3박 양식을 못 찾아 실패)
-    try { return json(kakaoText((await templateTabs(env("QUOTE_SHEET_ID") || DEFAULT_SHEET, env("GOOGLE_SA_JSON"))).join("\n") || "양식 탭이 없어요")); }
+    try { return json(kakaoText((await templateTabs(QUOTE_SHEET, env("GOOGLE_SA_JSON"))).join("\n") || "양식 탭이 없어요")); }
     catch (e) { return json(kakaoText(`⚠️ ${(e as Error).message}`)); }
   }
   if (testDel) {
-    try { return json(kakaoText(`🧪 시험 탭 ${await deleteTabs(env("QUOTE_SHEET_ID") || DEFAULT_SHEET, env("GOOGLE_SA_JSON"), TEST_TAG.trim())}개를 지웠어요.`)); }
+    try { return json(kakaoText(`🧪 시험 탭 ${await deleteTabs(QUOTE_SHEET, env("GOOGLE_SA_JSON"), TEST_TAG.trim())}개를 지웠어요.`)); }
     catch (e) { return json(kakaoText(`⚠️ ${(e as Error).message}`)); }
   }
   if (testQ) {
