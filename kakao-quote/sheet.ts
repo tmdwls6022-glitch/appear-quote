@@ -355,6 +355,9 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
   let last = 0;
   g.vals.forEach((row, r) => { if ((row ?? []).slice(0, 11).some((v) => v)) last = r; });
   for (const w of writes) if (w.col < 11 && w.row > last) last = w.row;
+  // jin 10/18: 견적서6 양식은 견적서 아래에 '행사장 단체 이용 계약서'가 같은 A~K열에 붙어 있어 PDF가 계약서까지 한 쪽에 작게 나왔음 → 계약서 제목 줄 앞에서 끊음
+  const contract = g.vals.findIndex((row, r) => r > 10 && (row ?? []).slice(0, 11).some((v) => /이용\s*계약서/.test(String(v ?? ""))));
+  if (contract > 0) { last = contract - 1; while (last > 0 && !(g.vals[last] ?? []).slice(0, 11).some((v) => v)) last--; }
   const range = `A1:K${last + 1}`;
 
   // 수정으로 다시 만든 경우 예전 탭은 지운다(시트에 탭이 쌓이지 않게)
@@ -372,7 +375,7 @@ export async function exportPdf(sheetId: string, gid: number, range: string, saJ
   const e = CFG.EXPORT;
   const p = new URLSearchParams({
     format: "pdf", gid: String(gid), range,
-    size: e.size, portrait: String(e.portrait), scale: String(e.scale), fitw: String(e.scale === 2),
+    size: e.size, portrait: String(e.portrait), scale: String(e.scale), ...(e.scale === 2 ? { fitw: "true" } : {}), // jin 10/18: fitw=false 를 같이 보내면 구글이 scale=4(한 쪽에 맞춤)를 무시하고 100%로 8쪽을 냄
     top_margin: String(e.margin), bottom_margin: String(e.margin), left_margin: String(e.margin), right_margin: String(e.margin),
     horizontal_alignment: "CENTER", vertical_alignment: "TOP",
     gridlines: "false", printtitle: "false", sheetnames: "false", pagenum: "UNDEFINED", fzr: "false", printnotes: "false",
