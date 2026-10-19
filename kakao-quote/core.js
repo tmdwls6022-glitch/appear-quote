@@ -5,7 +5,10 @@ export const CFG = {
   NOTION_VERSION: '2025-09-03',
   BRANCH: '어피어',                                    // 예약지점에 이 글자가 들어간 것만
   DEPOSIT_CLEAN: 100000,                               // 청소보증금
-  ACC_DEFAULT: '카카오뱅크 3333-15-5582511 김은하',
+  // jin 10/19: 부가세 없는 곳은 아래 세 계좌 중 하나(한 달마다 바꿀 수 있음, 지침은 jin이 따로 줌). 예전 카카오뱅크 3333-15-5582511 은 안 씀.
+  //   지침을 받기 전까지는 첫 계좌로 적고 '확인할 것'에 계좌 확인을 띄운다
+  ACC_DEFAULT: '농협 173801-51-059904 신향수',
+  ACC_OTHERS: ['농협 173801-51-059904 신향수', '카카오뱅크 3333-21-2982355 김은하', '카카오뱅크 3333-12-2247451 김홍철'],
   ACC_VAT: '신한 140-015-577115 (주)어피어플레이스',
   // 1인 단가(부가세 별도)
   PRICE: {
@@ -156,6 +159,7 @@ function buildQuote_(r) {
 
   var days = Math.max(1, nights); // 강당 대관 "하루" = 박 수
   var vat = !!r.vatDoc || type === 'company' || type === 'agency';   // jin 10/7: 대학원·사이버대·야간대(adultuniv)는 회사 단가지만 부가세 없음·기본 계좌
+  if (!vat) flags.push('입금 계좌를 ' + CFG.ACC_DEFAULT + '(으)로 적음 — 이번 달 계좌가 다르면 바꿔 주세요(신향수·김은하·김홍철 중)');   // jin 10/19
 
   return {
     org: eventOrg_(r.org, r.contact), contact: r.contact || '', phone: r.phone || '',

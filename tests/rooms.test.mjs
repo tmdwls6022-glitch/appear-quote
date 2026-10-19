@@ -1,6 +1,6 @@
 // 객실·단가 규칙 시험 — node tests/rooms.test.mjs (jin 10/7)
 import assert from "node:assert/strict";
-import { buildQuote_, assignRooms_, busyFromBookings_, priceTotals_ } from "../kakao-quote/core.js";
+import { buildQuote_, assignRooms_, busyFromBookings_, priceTotals_, CFG } from "../kakao-quote/core.js";
 const run = (r, bookings = []) => { const q = buildQuote_(r); assignRooms_(q, busyFromBookings_(bookings)); return { q, t: priceTotals_(q) }; };
 
 // 1. 기본(교회 일반)은 3인1실 온돌만 — 펜션·옵션 없음
@@ -50,7 +50,7 @@ assert.equal(run({ adults: 60, checkin: "2027-01-12", nights: 1, customerType: "
 
 // 6. 대학원·사이버대·야간대 = 회사 단가, 부가세 없음, 기본 계좌
 r = run({ adults: 30, checkin: "2026-11-13", nights: 1, customerType: "adultuniv" });
-assert.equal(r.q.unit, 75000); assert.equal(r.q.vat, false); assert.equal(r.t.total, 2250000); assert.match(r.t.account, /카카오뱅크/);
+assert.equal(r.q.unit, 75000); assert.equal(r.q.vat, false); assert.equal(r.t.total, 2250000); assert.ok(CFG.ACC_OTHERS.includes(r.t.account));   // jin 10/19: 부가세 없는 곳은 세 계좌 중 하나
 assert.equal(run({ adults: 30, checkin: "2026-11-13", nights: 1, customerType: "company" }).q.vat, true);
 
 // 7. 당일은 객실 없음
@@ -133,4 +133,15 @@ console.log("rooms.test 통과");
   const q2 = buildQuote_({ checkin: '2026-11-11', checkout: '2026-11-12', nights: 1, adults: 18, kids: 0, customerType: 'company' });
   assert.equal(q2.flags.filter((f) => f.startsWith('가격표에 없는 요청')).length, 0);
   console.log('특별 요청 확인할 것 OK');
+}
+
+// jin 10/19: 부가세 없는 곳은 세 계좌 중 하나 + 계좌 확인 표시, 부가세 있는 곳은 신한 법인 그대로
+{
+  const { buildQuote_, priceTotals_, assignRooms_, busyFromBookings_, CFG } = await import('../kakao-quote/core.js');
+  const mk = (t) => { const q = buildQuote_({ adults: 30, nights: 1, checkin: '2026-11-11', checkout: '2026-11-12', customerType: t }); assignRooms_(q, busyFromBookings_([])); return q; };
+  const ch = mk('church'), co = mk('company');
+  if (!CFG.ACC_OTHERS.includes(priceTotals_(ch).account) || /5582511/.test(priceTotals_(ch).account)) throw new Error('교회 계좌');
+  if (!ch.flags.some((f) => /입금 계좌/.test(f))) throw new Error('계좌 확인 표시 없음');
+  if (priceTotals_(co).account !== CFG.ACC_VAT || co.flags.some((f) => /입금 계좌/.test(f))) throw new Error('회사 계좌');
+  console.log('ok 계좌(10/19)');
 }
