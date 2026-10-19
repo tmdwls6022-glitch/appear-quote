@@ -123,3 +123,14 @@ console.log("rooms.test 통과");
   const d = run({ adults: 30, checkin: "2026-11-10", nights: 1, customerType: "university" });
   assert.equal(d.q.unit, 49000, "MT 는 끊지 않음");
 }
+
+// jin 10/19: 가격표에 없는 특별 요청 → 확인할 것
+{
+  const q = buildQuote_({ checkin: '2026-11-11', checkout: '2026-11-12', nights: 1, adults: 18, kids: 0, customerType: 'company', specials: ['09시 얼리 체크인', '', '야외 촬영 장소'] });
+  const sp = q.flags.filter((f) => f.startsWith('가격표에 없는 요청'));
+  assert.equal(sp.length, 2);
+  assert.ok(sp[0].includes('09시 얼리 체크인'));
+  const q2 = buildQuote_({ checkin: '2026-11-11', checkout: '2026-11-12', nights: 1, adults: 18, kids: 0, customerType: 'company' });
+  assert.equal(q2.flags.filter((f) => f.startsWith('가격표에 없는 요청')).length, 0);
+  console.log('특별 요청 확인할 것 OK');
+}

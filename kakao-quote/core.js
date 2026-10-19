@@ -89,6 +89,11 @@ function eventOrg_(org, contact) {
 
 function buildQuote_(r) {
   var flags = (r.unsure || []).slice();
+  // jin 10/19 카드 '띄우기': 가격표에 없는 특별 요청은 금액에 안 들어가니 사람이 넣게 알린다
+  (Array.isArray(r.specials) ? r.specials : []).slice(0, 8).forEach(function (s) {
+    s = String(s || '').trim();
+    if (s) flags.push('가격표에 없는 요청: ' + s.slice(0, 40) + ' — 금액은 직접 넣어 주세요');
+  });
   var nights = r.nights;
   if ((nights === null || nights === undefined) && r.checkin && r.checkout) {
     nights = Math.round((new Date(r.checkout) - new Date(r.checkin)) / 86400000);
