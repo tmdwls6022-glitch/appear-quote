@@ -30,10 +30,10 @@ export const CFG = {
   BBQ_NONE_DROP_1N: 10000,                             // 1박2일 바베큐 빼면 1인 −1만 — jin 10/20 Q21
   ROOM_EXTRA: 60000,                                   // 객실 1실 추가(1박) — jin 10/3
   MAIN_HALL_UPGRADE_SUMMER: 3000000, // jin 10/7: 7~8월은 300만
-  MAIN_HALL_UPGRADE_PEAK_130: 1000000,   // jin 10/21 Q40: 1~2월 금토일 대강당 업그레이드 130명 이상 100만, 100명 이상 150만
   HOLIDAY_EVE_1N: 10000,               // jin 10/21 Q39: 연휴·공휴일 전날 묵는 1박2일 1인 +1만(7~8월처럼)
   PEAK_WEEKDAY_DROP_1N: 5000,          // jin 10/21 Q38: 7~8월 평일 1박2일은 1인 −5천
-  MAIN_HALL_UPGRADE_PEAK: 1500000,   // jin 10/7: 7~8월 전체, 1~2월 금·토·일·공휴일은 150~300만 — 일단 150만으로 적고 사람이 정함
+  MAIN_HALL_UPGRADE_PEAK: 3000000,   // jin 10/21 Q40 '다': 1~2월 금·토·일·공휴일도 300만 (10/7 150~300만, 10/21 '130명+ 100만' 답을 대체)
+  MAIN_HALL_FREE_PEOPLE: 200,        // jin 10/21: 성수기 대강당 업그레이드비는 200명 이상 단체 아니면 무조건 부과 — 견적은 사람이 때마다 다르게 할 수 있음
   BBQ_300G_DROP: 4000,               // jin 10/7: BBQ 기본은 무제한, 300g 원하면 1인 −4천원
   MAIN_HALL_UPGRADE: 800000,   // jin 10/7: 작은 단체 대강당 업그레이드 기본 80만(한 번), 성수기는 300만까지 — 사람이 정함
   // 견적서 PDF·사진 내보내기 — jin 10/5: 배율은 나중에 실제 화면 보고 조정
@@ -221,8 +221,8 @@ function assignRooms_(q, busy) {
       var up = CFG.MAIN_HALL_UPGRADE;
       if (hallPeak_(q)) {
         if (q.month === 7 || q.month === 8) up = CFG.MAIN_HALL_UPGRADE_SUMMER;
-        else up = q.people >= 130 ? CFG.MAIN_HALL_UPGRADE_PEAK_130 : CFG.MAIN_HALL_UPGRADE_PEAK;   // jin 10/21 Q40: 인원에 따라
-        q.flags.push('성수기 대강당 업그레이드 — ' + (up / 10000) + '만으로 적음' + (q.month === 7 || q.month === 8 || q.people >= 100 ? '' : '(100명 미만 금액은 jin 확인 전)'));
+        else up = CFG.MAIN_HALL_UPGRADE_PEAK;
+        q.flags.push('성수기 대강당 업그레이드 — ' + (up / 10000) + '만으로 적음(사람이 때마다 정할 수 있음)');
       }
       q.extraHalls.push({ name: '대강당 업그레이드', label: hall.replace(' OR 3강당', '') + ' → 대강당', day: up, qty: 1, amount: up });
       q.hall = '대강당';   // 강당 줄은 대강당으로 (실제 견적처럼), 업그레이드 비용은 아래 줄
@@ -230,6 +230,12 @@ function assignRooms_(q, busy) {
     }
     q.extraHalls.push({ name: name + ' (추가)', label: '추가 대관 ' + q.days + '일 (하루 ' + h.extra.toLocaleString() + '원)', day: h.extra, qty: q.days, amount: h.extra * q.days });
   });
+  // jin 10/21: 성수기(7~8월, 1~2월 금토일·공휴일)엔 200명 미만이 대강당을 쓰면 요청이 없어도 업그레이드비 부과 (131~199명은 인원 때문에 대강당 배정)
+  if (q.hall === '독립대강당' && !q.extraHalls.some(function (h) { return h.name === '대강당 업그레이드'; }) && hallPeak_(q) && q.people < CFG.MAIN_HALL_FREE_PEOPLE) {
+    var up2 = (q.month === 7 || q.month === 8) ? CFG.MAIN_HALL_UPGRADE_SUMMER : CFG.MAIN_HALL_UPGRADE_PEAK;
+    q.extraHalls.push({ name: '대강당 업그레이드', label: '성수기 대강당 사용(' + CFG.MAIN_HALL_FREE_PEOPLE + '명 미만)', day: up2, qty: 1, amount: up2 });
+    q.flags.push('성수기 대강당 업그레이드 — ' + (up2 / 10000) + '만으로 적음(' + CFG.MAIN_HALL_FREE_PEOPLE + '명 미만, 사람이 때마다 정할 수 있음)');
+  }
   if (q.extraRooms && q.nights > 0) {
     var rq = q.extraRooms * q.nights;
     q.extraHalls.push({ name: '객실 추가', label: q.extraRooms + '실 × ' + q.nights + '박 (1실 ' + CFG.ROOM_EXTRA.toLocaleString() + '원)', day: CFG.ROOM_EXTRA, qty: rq, amount: CFG.ROOM_EXTRA * rq });

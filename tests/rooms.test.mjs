@@ -44,8 +44,8 @@ let r = run({ adults: 60, checkin: "2026-11-13", nights: 2, customerType: "churc
 assert.deepEqual(r.q.extraHalls.map((h) => [h.name, h.amount]), [["대강당 업그레이드", 800000]]);
 r = run({ adults: 60, checkin: "2027-07-16", nights: 1, customerType: "church", wantsMainHall: true });
 assert.equal(r.q.extraHalls[0].amount, 3000000); assert.ok(r.q.flags.some((f) => /300만/.test(f)));   // 7~8월 300만
-// 1~2월 금토일 낀 때도 150만, 평일만이면 80만
-assert.equal(run({ adults: 60, checkin: "2027-01-15", nights: 1, customerType: "church", wantsMainHall: true }).q.extraHalls[0].amount, 1500000);  // 금
+// 1~2월 금토일 낀 때도 300만(jin 10/21 Q40 다), 평일만이면 80만
+assert.equal(run({ adults: 60, checkin: "2027-01-15", nights: 1, customerType: "church", wantsMainHall: true }).q.extraHalls[0].amount, 3000000);  // 금
 assert.equal(run({ adults: 60, checkin: "2027-01-12", nights: 1, customerType: "church", wantsMainHall: true }).q.extraHalls[0].amount, 800000);   // 화~수
 
 // 6. 대학원·사이버대·야간대 = 회사 단가, 부가세 없음, 기본 계좌
@@ -78,7 +78,7 @@ console.log("rooms.test 통과");
   assert.equal(run({ adults: 40, checkin: "2026-11-11", nights: 0, customerType: "company" }).q.unit, 43000);   // 수
   assert.equal(run({ adults: 40, checkin: "2026-11-14", nights: 0, customerType: "company" }).q.unit, 47000);   // 토
   const w = run({ adults: 40, checkin: "2027-01-22", nights: 2, customerType: "church", wantsMainHall: true });
-  assert.ok(w.q.flags.some((f) => /150만/.test(f)));
+  assert.ok(w.q.flags.some((f) => /300만/.test(f)));
   console.log("rooms.test 8 통과");
 }
 { // jin 10/10: 1~2월 금토일 1박2일도 7.5만 (+1만은 7~8월만)
@@ -181,8 +181,11 @@ console.log("rooms.test 통과");
   assert.equal(run({ adults: 30, checkin: "2026-12-23", nights: 1, customerType: "church" }).q.unit, 75000);
   const mt = run({ adults: 60, checkin: "2026-11-10", nights: 1, customerType: "university" });
   assert.equal(mt.t.deposit, Math.round(mt.t.total * 0.3 / 100000) * 100000);
-  const big = run({ adults: 140, checkin: "2027-01-15", nights: 1, customerType: "church", wantsMainHall: true });
-  const up = big.q.extraHalls.find((h) => h.name === "대강당 업그레이드");
-  if (up) assert.equal(up.amount, 1000000);
+  const upAmt = (n, ci) => (run({ adults: n, checkin: ci, nights: 1, customerType: "church", wantsMainHall: true }).q.extraHalls.find((h) => h.name === "대강당 업그레이드") || {}).amount;
+  assert.equal(upAmt(140, "2027-01-15"), 3000000);   // 1~2월 금, 200명 미만
+  assert.equal(upAmt(60, "2027-07-14"), 3000000);    // 7~8월
+  assert.equal(upAmt(210, "2027-07-14"), undefined); // 200명 이상은 안 받음
+  assert.equal(upAmt(140, "2026-11-11"), undefined); // 비수기 큰 단체는 원래 대강당
+  assert.equal(upAmt(60, "2026-11-11"), 800000);     // 비수기 작은 단체 요청 80만
   console.log('10/21 가격 답 통과');
 }
