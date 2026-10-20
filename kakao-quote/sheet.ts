@@ -138,6 +138,8 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
       for (let r = h0.row + 1; r < h0.row + 45 && r < g0.vals.length; r++) {
         const k = String(g0.vals[r]?.[kc] ?? ""), c = String(g0.vals[r]?.[cc] ?? "");
         if (/주류\s*무제한|무제한\s*바베큐/.test(k)) { del.push(r); continue; }
+        // jin 10/20: 바베큐 미이용이면 'BBQ'·'서비스 메뉴' 줄을 '미이용/제외'로 두지 말고 뺀다
+        if (!q.bbq && (!sel0 || r < sel0.row) && (/^BBQ/i.test(k) || /서비스\s*메뉴/.test(k))) { del.push(r); continue; }
         // jin 10/7: 2차 안주(닭발·오뎅탕 등)는 교회팀·아동센터·중고등학교에는 안 보냄
         if (dropSnack && /2차\s*안주|닭발|오뎅탕/.test(k + " " + c)) { del.push(r); continue; }
         if (sel0 && r >= sel0.row) continue;
@@ -259,6 +261,7 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
     } else if (/서비스 메뉴/.test(kind)) {
       setC(r, "수량", q.bbq ? q.people : "—"); setC(r, "단가", q.bbq ? "포함" : "제외");
     } else if (/^한식/.test(kind)) {
+      if (!q.bbq && col["비고"] !== undefined && meals.total) setC(r, "비고", meals.total);   // BBQ 줄을 지워 '총 N식'이 사라졌을 때
       setC(r, "내용", q.bbq ? meals.korean : (meals.noBbq || meals.korean));
       setC(r, "수량", q.people); setC(r, "단가", "포함");
     } else if (isRoom && /펜션/.test(content)) {

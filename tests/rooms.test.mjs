@@ -33,7 +33,7 @@ assert.equal(rr.q.pensionPaid, true); assert.equal(rr.t.supply, 49000 * 30);
 assert.equal(q.ondolOnly, 21);
 
 // 4. 2박3일 비수기 평일 12만 / 주말 13만 (jin 10/7 답 7-나)
-assert.equal(run({ adults: 40, checkin: "2026-11-11", nights: 2, customerType: "church" }).q.unit, 120000);  // 수~금
+assert.equal(run({ adults: 40, checkin: "2026-11-11", nights: 2, customerType: "church" }).q.unit, 130000);  // 수~금 — jin 10/20: 비수기 2박3일은 요일 무관 13만
 assert.equal(run({ adults: 40, checkin: "2026-11-13", nights: 2, customerType: "church" }).q.unit, 130000);  // 금~일
 // 1박2일 비수기 7.5만, 여름 8.5만
 assert.equal(run({ adults: 40, checkin: "2026-11-13", nights: 1, customerType: "church" }).q.unit, 75000);
