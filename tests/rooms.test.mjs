@@ -90,7 +90,7 @@ console.log("rooms.test 통과");
   console.log('1~2월 금토일 7.5만 통과');
 }
 { // 9. 성수기: 1~2월 금토일·공휴일
-  const pk = (ci, n) => run({ adults: 40, checkin: ci, nights: n, customerType: "church", wantsMainHall: true }).q.flags.some((f) => /최대 300만/.test(f));
+  const pk = (ci, n) => run({ adults: 40, checkin: ci, nights: n, customerType: "church", wantsMainHall: true }).q.flags.some((f) => /성수기 대강당/.test(f));
   assert.equal(pk("2027-01-20", 1), false);  // 수~목
   assert.equal(pk("2027-01-22", 1), true);   // 금
   assert.equal(pk("2027-02-08", 1), true);   // 설 연휴(월)
@@ -170,4 +170,19 @@ console.log("rooms.test 통과");
   assert.equal(run({ adults: 30, checkin: "2026-11-09", nights: 4, customerType: "church" }).q.unit, 260000);
   assert.throws(() => buildQuote_({ adults: 30, checkin: "2026-11-09", nights: 5, customerType: "church" }));
   console.log('10/20 가격 답 통과');
+}
+
+// jin 10/21 가격 답: 회사 2박 15만, 7~8월 평일 1박 −5천, 공휴일 전날 1박 +1만, MT 계약금 상한 없음, 1~2월 대강당 130명+ 100만
+{
+  assert.equal(run({ adults: 30, checkin: "2026-11-11", nights: 2, customerType: "company" }).q.unit, 150000);
+  assert.equal(run({ adults: 30, checkin: "2027-07-13", nights: 1, customerType: "church" }).q.unit, 80000);   // 화요일
+  assert.equal(run({ adults: 30, checkin: "2027-07-16", nights: 1, customerType: "church" }).q.unit, 85000);   // 금요일
+  assert.equal(run({ adults: 30, checkin: "2026-12-24", nights: 1, customerType: "church" }).q.unit, 85000);   // 성탄 전날(목)
+  assert.equal(run({ adults: 30, checkin: "2026-12-23", nights: 1, customerType: "church" }).q.unit, 75000);
+  const mt = run({ adults: 60, checkin: "2026-11-10", nights: 1, customerType: "university" });
+  assert.equal(mt.t.deposit, Math.round(mt.t.total * 0.3 / 100000) * 100000);
+  const big = run({ adults: 140, checkin: "2027-01-15", nights: 1, customerType: "church", wantsMainHall: true });
+  const up = big.q.extraHalls.find((h) => h.name === "대강당 업그레이드");
+  if (up) assert.equal(up.amount, 1000000);
+  console.log('10/21 가격 답 통과');
 }
