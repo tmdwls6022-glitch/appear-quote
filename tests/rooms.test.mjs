@@ -145,3 +145,17 @@ console.log("rooms.test 통과");
   if (priceTotals_(co).account !== CFG.ACC_VAT || co.flags.some((f) => /입금 계좌/.test(f))) throw new Error('회사 계좌');
   console.log('ok 계좌(10/19)');
 }
+{ // jin 10/20: 펜션 옵션은 야유회·대학·청년부·MT·가족모임·동창, 또는 단체실·펜션 요청만
+  const { buildQuote_, assignRooms_, busyFromBookings_ } = await import('../kakao-quote/core.js');
+  const ro = (r) => { const q = buildQuote_({ checkin: '2026-11-20', nights: 1, adults: 25, ...r }); assignRooms_(q, busyFromBookings_([])); return q.roomOptions; };
+  const eq = (a, b, m) => { if (a !== b) throw new Error(m + ': ' + a + ' != ' + b); };
+  eq(ro({ org: '골든 브라스 색소폰 동호회', customerType: 'group' }), false, '동호회');
+  eq(ro({ org: '팀 불도저 종합격투기 선수단', customerType: 'group' }), false, '선수단');
+  eq(ro({ org: '○○회사 가을 야유회', customerType: 'company' }), true, '야유회');
+  eq(ro({ org: '김OO님 가족모임', customerType: 'group' }), true, '가족모임');
+  eq(ro({ org: '○○교회 청년부', customerType: 'church' }), true, '청년부');
+  eq(ro({ org: '○○대 경영학과', customerType: 'university' }), true, 'MT');
+  eq(ro({ org: '○○동호회', customerType: 'group', notes: '단체실 원해요' }), true, '단체실 요청');
+  eq(ro({ org: '○○동호회', customerType: 'group', wantsPension: true }), true, '펜션 요청');
+  console.log('펜션 옵션 대상 통과');
+}

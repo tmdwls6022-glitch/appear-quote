@@ -146,6 +146,8 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
         if (q.nights === 0) {   // jin 10/10: 당일 — 숙박·조식 줄 없음 (실제 당일 견적 135건)
           if (/^한식|조식/.test(k) || (opt > 0 && (/객실/.test(k) || /펜션|온돌|침대/.test(c)))) { del.push(r); continue; }
         }
+        // jin 10/20: 객실옵션 1에서 온돌이 0실이면(펜션만으로 다 잠) 옵션 1의 온돌 줄을 뺀다
+        if (q.roomOptions && q.nights > 0 && q.ondol === 0 && opt === 1 && /온돌|침대/.test(c) && !/펜션/.test(c)) { del.push(r); continue; }
         if (!q.roomOptions && q.nights > 0) {
           if (opt === 1 && (k || /펜션|온돌|침대/.test(c))) del.push(r);                 // 옵션 1 두 줄
           else if (opt === 3 && /펜션/.test(c)) del.push(r);                             // 옵션 없는 양식의 펜션 줄
@@ -261,6 +263,7 @@ export async function writeQuote(q: any, reqText: string, sheetId: string, saJso
       setC(r, "수량", q.people); setC(r, "단가", "포함");
     } else if (isRoom && /펜션/.test(content)) {
       pensionDone = true;
+      if (!kind && q.roomOptions) setC(r, "서비스종류", "객실옵션 1");   // 옵션 1 머리 칸이 온돌 줄과 같이 지워졌을 때
       if (false) {
         // MT: 펜션은 1동 15만 추가 (실제 견적 230건) — 총액은 온돌 기준, 옵션 1을 고르면 더해짐
         setC(r, "내용", pensionText_(q.pensions));

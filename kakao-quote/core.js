@@ -240,12 +240,15 @@ function assignRooms_(q, busy) {
 }
 
 var YOUNG_RE_ = /청년|대학부|고등부|중고등|중등부|학생부|청소년|\bMT\b|엠티/i;
-var SOCIAL_RE_ = /동창|동문|동호회|친목|가족|향우|계모임|친구|산악회|모임/;
+// jin 10/20: 펜션동(객실옵션 1·2)은 야유회 성격·대학생·청년부·MT·가족모임 같은 곳, 그리고 요청에 단체실·펜션동을 쓴다고 한 곳만.
+// 동호회·클럽·선수단·협회처럼 성격만 '모임'인 곳은 기본 3인1실 온돌.
+var SOCIAL_RE_ = /동창|동문|가족|친구|야유회/;
+var ASK_PENSION_RE_ = /펜션|독채|단체\s*실|단체\s*룸|다인실/;
 function roomOptions_(q) {
   if (q.wantsPension) return true;
-  if (q.type === 'university' || q.type === 'group') return true;    // MT, 가족·친구·동창 같은 일반 모임
+  if (q.type === 'university') return true;    // 대학생·MT
   var t = (q.org || '') + ' ' + (q.notes || '');
-  return YOUNG_RE_.test(t) || SOCIAL_RE_.test(t);
+  return YOUNG_RE_.test(t) || SOCIAL_RE_.test(t) || ASK_PENSION_RE_.test(q.notes || '');
 }
 
 // 공휴일 (콜로그 Config.gs HOLIDAYS_ 와 같은 목록, 1~2월 성수기 판단용) — 새 해가 오면 더한다
