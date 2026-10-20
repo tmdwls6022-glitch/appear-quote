@@ -65,7 +65,7 @@ assert.equal(run({ adults: 30, checkin: "2027-08-13", nights: 1, customerType: "
 assert.equal(run({ adults: 30, checkin: "2027-08-13", nights: 1, customerType: "company" }).q.unit, 85000);                   // 75+1만
 assert.equal(run({ adults: 30, checkin: "2026-11-13", nights: 1, customerType: "church", twinRoom: true }).q.unit, 85000);     // 고정
 assert.equal(run({ adults: 30, checkin: "2026-11-13", nights: 2, customerType: "university" }).q.unit, 130000);                // 대학 108,000 안 씀
-assert.throws(() => run({ adults: 30, checkin: "2026-11-13", nights: 4, customerType: "church" }), /직접 정함/);
+assert.throws(() => run({ adults: 30, checkin: "2026-11-13", nights: 5, customerType: "church" }), /직접 정함/);   // 10/20: 4박5일은 자동(26만), 5박부터 사람이
 r = run({ adults: 30, kids: 5, checkin: "2026-11-13", nights: 1, customerType: "church" });
 assert.equal(r.t.kidDisc, 0); assert.ok(r.q.flags.some((f) => /초등 이하/.test(f)));
 assert.equal(run({ adults: 30, checkin: "2026-11-13", nights: 1, customerType: "church" }).q.hall, "2강당");
@@ -158,4 +158,16 @@ console.log("rooms.test 통과");
   eq(ro({ org: '○○동호회', customerType: 'group', notes: '단체실 원해요' }), true, '단체실 요청');
   eq(ro({ org: '○○동호회', customerType: 'group', wantsPension: true }), true, '펜션 요청');
   console.log('펜션 옵션 대상 통과');
+}
+
+// jin 10/20 가격 답: 식사 1끼 −8천, 1박 BBQ 빼면 −1만, 당일 한식 3.7/4.5만, 4박5일 26만 자동
+{
+  assert.equal(run({ adults: 30, checkin: "2026-11-11", nights: 2, customerType: "church", skipMeals: 1 }).q.unit, 120000);   // 13만−8천=12.2만 → 만원 단위 12만
+  assert.equal(run({ adults: 30, checkin: "2026-11-10", nights: 1, customerType: "church", bbq: false }).q.unit, 65000);
+  assert.equal(run({ adults: 30, checkin: "2026-11-10", nights: 1, customerType: "university", bbq: false }).q.unit, 49000);  // MT는 그대로
+  assert.equal(run({ adults: 30, checkin: "2026-11-10", nights: 0, customerType: "church", bbq: false }).q.unit, 37000);
+  assert.equal(run({ adults: 30, checkin: "2026-11-14", nights: 0, customerType: "church", bbq: false }).q.unit, 45000);
+  assert.equal(run({ adults: 30, checkin: "2026-11-09", nights: 4, customerType: "church" }).q.unit, 260000);
+  assert.throws(() => buildQuote_({ adults: 30, checkin: "2026-11-09", nights: 5, customerType: "church" }));
+  console.log('10/20 가격 답 통과');
 }

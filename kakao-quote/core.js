@@ -13,11 +13,11 @@ export const CFG = {
   ACC_VAT: '신한 140-015-577115 (주)어피어플레이스',
   // 1인 단가(부가세 별도)
   PRICE: {
-    '당일': { bbq: 43000, korean: 30000, bbqHigh: 47000, koreanHigh: 37000 }, // jin 10/7: 평일 4.3만, 금·토·일·성수기 4.7만
+    '당일': { bbq: 43000, korean: 37000, bbqHigh: 47000, koreanHigh: 45000 }, // jin 10/7: 평일 4.3만, 금·토·일·성수기 4.7만 / 10/20: BBQ 없는 한식 평일 3.7만·주말 4.5만
     '1박2일': { church: 75000, group: 75000, company3: 75000, company2: 85000, mt: 49000 },
     '2박3일': { uni: 130000, offWeekday: 130000, offWeekend: 130000, peak: 150000 }, // jin 10/7·10/20: 비수기 요일 무관 13만(5식 기준), 7~8월 15만
     '3박4일': { def: 185000, peak: 210000 },        // jin 10/7 Q9 '나': 실제 견적 18.5~21만이라 올림(비수기 18.5만, 7~8월 21만 — 정확한 값은 jin 확인)
-    '4박5일': { def: 260000 }
+    '4박5일': { def: 260000 }                      // jin 10/20 Q15 '가': 4박5일 26만으로 자동 견적
   },
   KID_DISCOUNT: 20000,
   PENSION_CAP: 25,
@@ -25,7 +25,8 @@ export const CFG = {
   PENSION_EXTRA: 150000,
   PEAK_1N: 10000,                                      // 1박2일 7~8월 1인 추가
   TWIN_PER_NIGHT: 10000,                               // 2인1실 1인 1박당 추가 — jin 10/3
-  MEAL_DROP: 10000,                                    // 식사 1끼 빼면 1인 −1만, 7~8월 불가 — jin 10/3
+  MEAL_DROP: 8000,                                     // 식사 1끼 빼면 1인 −8천(모든 일정), 7~8월 불가 — jin 10/3 −1만 → 10/20 Q12 '가' −8천
+  BBQ_NONE_DROP_1N: 10000,                             // 1박2일 바베큐 빼면 1인 −1만 — jin 10/20 Q21
   ROOM_EXTRA: 60000,                                   // 객실 1실 추가(1박) — jin 10/3
   MAIN_HALL_UPGRADE_SUMMER: 3000000, // jin 10/7: 7~8월은 300만
   MAIN_HALL_UPGRADE_PEAK: 1500000,   // jin 10/7: 7~8월 전체, 1~2월 금·토·일·공휴일은 150~300만 — 일단 150만으로 적고 사람이 정함
@@ -103,7 +104,7 @@ function buildQuote_(r) {
     nights = Math.round((new Date(r.checkout) - new Date(r.checkin)) / 86400000);
   }
   if (nights === null || nights === undefined) { nights = 1; flags.push('박 수를 몰라 1박2일로 가정'); }
-  if (nights >= 4) throw new Error(nights + '박' + (nights + 1) + '일 이상은 견적을 자동으로 만들지 않아요(jin 10/7: 사람이 직접 정함)');
+  if (nights >= 5) throw new Error(nights + '박' + (nights + 1) + '일 이상은 견적을 자동으로 만들지 않아요(jin 10/7: 사람이 직접 정함, 10/20: 4박5일까지만 자동)');
   var period = periodName_(nights);
   var adults = Number(r.adults) || 0, kids = Number(r.kids) || 0;
   var people = adults + kids;
@@ -136,9 +137,10 @@ function buildQuote_(r) {
   } else { unit = (CFG.PRICE[period].peak && (month === 7 || month === 8)) ? CFG.PRICE[period].peak : CFG.PRICE[period].def; tpl = 'long'; pkgName = '수련회 패키지'; }
   if (nights >= 2 && r.twinRoom) unit += CFG.TWIN_PER_NIGHT * nights;   // 2인1실: 1박당 +1만
   if (r.bbq300 && r.bbq !== false && period !== '당일') { unit -= CFG.BBQ_300G_DROP; flags.push('BBQ 300g 요청 — 1인 ' + CFG.BBQ_300G_DROP.toLocaleString() + '원 깎음'); }
-  if (r.bbq === false && period !== '당일') flags.push('바베큐 제외 요청 — 가격 조정은 사람이 정함');
+  if (r.bbq === false && period === '1박2일' && type !== 'university') { unit -= CFG.BBQ_NONE_DROP_1N; flags.push('바베큐 제외 — 1인 ' + CFG.BBQ_NONE_DROP_1N.toLocaleString() + '원 깎음(jin 10/20)'); }
+  else if (r.bbq === false && period !== '당일') flags.push('바베큐 제외 요청 — 가격 조정은 사람이 정함');
   if (type === 'agency') flags.push('여행사는 단가가 때때로 달라 사람이 확인');
-  if (kids > 0) flags.push('초등 이하 ' + kids + '명 — 할인 금액은 사람이 정함(자동 할인 없음)');
+  if (kids > 0) flags.push('초등 이하 ' + kids + '명 — 할인 금액은 사람이 정함(참고 jin 10/20: 2박 이상이면 미취학 무료·초등 −2만)');
   var skip = Number(r.skipMeals) || 0;
   if (skip > 0 && period !== '당일') {
     if (month === 7 || month === 8) flags.push('7~8월은 식사를 뺄 수 없음 — 고객이 ' + skip + '끼 빼 달라고 함');
