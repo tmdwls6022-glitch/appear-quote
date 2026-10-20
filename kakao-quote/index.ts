@@ -119,7 +119,7 @@ const RULES = [
   "- bbq: 바베큐·바비큐·BBQ 를 원하면 true, '바베큐 말고'처럼 빼 달라면 false, 말이 없으면 null.",
   "- wantsMainHall: '대강당'을 콕 집어 원할 때만 true. '강당 필요'만으로는 false.",
   "- bbq300: 바베큐 고기를 300g(소량)으로 해 달라고 하면 true.",
-  "- wantsPension: 펜션·펜션동·독채·단체실(단체룸)을 원하거나, 여럿이 한 방(다인실·큰 방)에서 자고 싶다고 하면 true.",
+  "- wantsPension: '펜션'·'펜션동'·'단체실'·'단체룸'이라는 말이 있을 때만 true.",
   "- twinRoom: '2인1실'을 원할 때만 true. vatDoc: 세금계산서·부가세 포함·카드결제를 말할 때만 true.",
   // jin 10/19 카드 '띄우기': 가격표에 없는 요청은 금액에서 빠지니 '확인할 것'에 띄운다(금액은 사람이)
   "- specials: 기본 패키지(객실·정해진 식사·바베큐·강당·운동장·기본 음향 마이크/스피커·캠프파이어)에 없는 요청만. 예: 전문 MC·레크 강사·음향 오퍼레이터, 행사 도구 대여(에어봉 등), 출장 뷔페·주류·생맥주, 심야 야식 조리, 얼리 체크인·레이트 체크아웃, 퇴실 뒤 세미나실 연장, 그릴·장비 대여, 무대, 촬영 장소, 정해진 시간과 다른 식사(브런치 등), 소음·독채 보장. 한 요청에 한 줄, 20자 안팎. 기본 패키지에 있는 것은 넣지 않는다.",
@@ -236,6 +236,8 @@ function summary(q: any, t: any, url: string) {
 const TEST_TAG = "🧪시험 ";
 async function makeQuote(text: string, adj: { req: any; replaceGid: number | null; note: string; test?: boolean } | null = null, asof?: string, test = false) {
   const req = adj ? adj.req : await parseRequest(text, asof);
+  // jin 10/20: 펜션 옵션은 요청글에 '펜션(동)'·'단체실(룸)'이라고 쓴 경우만 — AI가 '독채'·'온돌방'으로 짐작하지 않게 글에서 직접 본다
+  if (!adj) req.wantsPension = /펜션|단체\s*실|단체\s*룸/.test(text);
   const q: any = buildQuote_(req);
   if (test || adj?.test) q.org = TEST_TAG + q.org;   // jin 10/18: 시험 탭은 이름으로 구분(시험지우기로 한꺼번에 지움)
   let bookings: any[] = [];
