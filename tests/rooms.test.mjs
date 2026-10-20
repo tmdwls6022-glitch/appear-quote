@@ -189,3 +189,24 @@ console.log("rooms.test 통과");
   assert.equal(upAmt(60, "2026-11-11"), 800000);     // 비수기 작은 단체 요청 80만
   console.log('10/21 가격 답 통과');
 }
+{ // 10. jin 10/20 가격 답
+  const { buildQuote_, priceTotals_ } = await import('../kakao-quote/core.js');
+  assert.equal(buildQuote_({ checkin: '2026-11-17', nights: 2, adults: 20, customerType: 'company' }).unit, 150000);   // Q34 회사 2박3일 15만
+  assert.equal(buildQuote_({ checkin: '2026-11-17', nights: 2, adults: 20, customerType: 'church' }).unit, 130000);
+  assert.equal(buildQuote_({ checkin: '2026-11-17', nights: 3, adults: 20, customerType: 'church' }).unit, 190000);   // 3박4일 19만
+  assert.equal(buildQuote_({ checkin: '2027-01-15', nights: 3, adults: 20, customerType: 'church' }).unit, 210000);   // Q48 1~2월 금 낀 3박4일 21만
+  assert.equal(buildQuote_({ checkin: '2026-10-08', nights: 1, adults: 30, customerType: 'church' }).unit, 85000);    // Q39 한글날(10/9) 전날 +1만
+  assert.equal(buildQuote_({ checkin: '2026-10-14', nights: 1, adults: 30, customerType: 'church' }).unit, 75000);
+  // Q40 '다'(jin 10/21): 1~2월 금토일 대강당 업그레이드도 300만
+  const big = run({ adults: 120, checkin: '2027-01-22', nights: 1, customerType: 'church', wantsMainHall: true });
+  assert.equal(big.q.extraHalls.find((h) => /업그레이드/.test(h.name)).amount, 3000000);
+  // 반나절 추가 강당은 절반, 얼리·레이트는 30만 한 번
+  const half = run({ adults: 30, checkin: '2026-11-17', nights: 1, customerType: 'church', extraHalls: ['1강당'], halfDayHall: true, earlyLate: true });
+  assert.equal(half.q.extraHalls.find((h) => /1강당/.test(h.name)).amount, 150000);
+  assert.equal(half.q.extraHalls.find((h) => /얼리/.test(h.name)).amount, 300000);
+  // Q37 MT 계약금도 30%(최대 30만 없음)
+  const mt = buildQuote_({ checkin: '2026-11-17', nights: 1, adults: 100, customerType: 'university' });
+  mt.extraHalls = [];
+  assert.equal(priceTotals_(mt).deposit, 1500000);
+  console.log('10/20 가격 답 통과');
+}

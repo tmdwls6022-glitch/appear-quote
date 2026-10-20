@@ -17,7 +17,7 @@ export const CFG = {
     '1박2일': { church: 75000, group: 75000, company3: 75000, company2: 85000, mt: 49000 },
     '2박3일': { uni: 130000, offWeekday: 130000, offWeekend: 130000, peak: 150000, company: 150000 },   // company: jin 10/21 Q34 회사 워크숍 2박3일 15만
     // jin 10/7·10/20: 비수기 요일 무관 13만(5식 기준), 7~8월 15만
-    '3박4일': { def: 185000, peak: 210000 },        // jin 10/7 Q9 '나': 실제 견적 18.5~21만이라 올림(비수기 18.5만, 7~8월 21만 — 정확한 값은 jin 확인)
+    '3박4일': { def: 190000, peak: 210000 },        // jin 10/20: 비수기 19만(18.5만 아님), 7~8월·1~2월 금토일 21만(Q14·Q48)
     '4박5일': { def: 260000 }                      // jin 10/20 Q15 '가': 4박5일 26만으로 자동 견적
   },
   KID_DISCOUNT: 20000,
@@ -34,6 +34,8 @@ export const CFG = {
   PEAK_WEEKDAY_DROP_1N: 5000,          // jin 10/21 Q38: 7~8월 평일 1박2일은 1인 −5천
   MAIN_HALL_UPGRADE_PEAK: 3000000,   // jin 10/21 Q40 '다': 1~2월 금·토·일·공휴일도 300만 (10/7 150~300만, 10/21 '130명+ 100만' 답을 대체)
   MAIN_HALL_FREE_PEOPLE: 200,        // jin 10/21: 성수기 대강당 업그레이드비는 200명 이상 단체 아니면 무조건 부과 — 견적은 사람이 때마다 다르게 할 수 있음
+  HALF_DAY_RATE: 0.5,                // jin 10/20: 강당 오전만·오후만은 하루 대관료의 절반(필요하면 사람이 고침)
+  EARLY_LATE: 300000,                // jin 10/20: 얼리 체크인·레이트 체크아웃 한 번에 30만
   BBQ_300G_DROP: 4000,               // jin 10/7: BBQ 기본은 무제한, 300g 원하면 1인 −4천원
   MAIN_HALL_UPGRADE: 800000,   // jin 10/7: 작은 단체 대강당 업그레이드 기본 80만(한 번), 성수기는 300만까지 — 사람이 정함
   // 견적서 PDF·사진 내보내기 — jin 10/5: 배율은 나중에 실제 화면 보고 조정
@@ -141,12 +143,17 @@ function buildQuote_(r) {
     else unit = hasWeekendNight_(r.checkin, nights) ? CFG.PRICE['2박3일'].offWeekend : CFG.PRICE['2박3일'].offWeekday;
     if (!r.checkin) flags.push('날짜를 몰라 평일 단가 사용');
     tpl = '2박3일'; pkgName = '수련회 패키지';
-  } else { unit = (CFG.PRICE[period].peak && (month === 7 || month === 8)) ? CFG.PRICE[period].peak : CFG.PRICE[period].def; tpl = 'long'; pkgName = '수련회 패키지'; }
+  } else {
+    // jin 10/20 Q48: 3박4일은 1~2월 금·토·일·공휴일도 7~8월처럼 21만
+    var longPeak = month === 7 || month === 8 || (period === '3박4일' && isPeak_({ month: month, checkin: r.checkin, nights: nights }));
+    unit = (CFG.PRICE[period].peak && longPeak) ? CFG.PRICE[period].peak : CFG.PRICE[period].def; tpl = 'long'; pkgName = '수련회 패키지';
+  }
   if (nights >= 2 && r.twinRoom) unit += CFG.TWIN_PER_NIGHT * nights;   // 2인1실: 1박당 +1만
   if (r.bbq300 && r.bbq !== false && period !== '당일') { unit -= CFG.BBQ_300G_DROP; flags.push('BBQ 300g 요청 — 1인 ' + CFG.BBQ_300G_DROP.toLocaleString() + '원 깎음'); }
   if (r.bbq === false && period === '1박2일' && type !== 'university') { unit -= CFG.BBQ_NONE_DROP_1N; flags.push('바베큐 제외 — 1인 ' + CFG.BBQ_NONE_DROP_1N.toLocaleString() + '원 깎음(jin 10/20)'); }
   else if (r.bbq === false && period !== '당일') flags.push('바베큐 제외 요청 — 가격 조정은 사람이 정함');
   // jin 10/21 Q43: 여행사도 같은 단가 — '사람이 확인' 안내 뺌
+  if (r.spaceOnly) flags.push('숙박·식사 없이 공간만 대관 — 가격은 사람이 정함(jin 10/20, 지금 단가는 패키지 기준)');
   if (kids > 0) flags.push('초등 이하 ' + kids + '명 — 할인 금액은 사람이 정함(참고 jin 10/20: 2박 이상이면 미취학 무료·초등 −2만)');
   var skip = Number(r.skipMeals) || 0;
   if (skip > 0 && period !== '당일') {
@@ -176,7 +183,7 @@ function buildQuote_(r) {
     adults: adults, kids: kids, people: people, period: period, nights: nights, days: days,
     checkin: r.checkin || null, checkout: r.checkout || null, scheduleText: r.scheduleText || '',
     type: type, unit: unit, tplKey: tpl, pkgName: pkgName, bbq: bbq, vat: vat,
-    twin: !!r.twinRoom, wantsMainHall: !!r.wantsMainHall, wantsPension: !!r.wantsPension, bbq300: !!r.bbq300, extraHallsWanted: r.extraHalls || [], extraRooms: Number(r.extraRooms) || 0, skipMeals: Number(r.skipMeals) || 0, month: month,
+    twin: !!r.twinRoom, wantsMainHall: !!r.wantsMainHall, wantsPension: !!r.wantsPension, bbq300: !!r.bbq300, halfDayHall: !!r.halfDayHall, earlyLate: !!r.earlyLate, extraHallsWanted: r.extraHalls || [], extraRooms: Number(r.extraRooms) || 0, skipMeals: Number(r.skipMeals) || 0, month: month,
     notes: r.notes || '', flags: flags, lines: [], extras: []
   };
 }
@@ -228,6 +235,12 @@ function assignRooms_(q, busy) {
       q.hall = '대강당';   // 강당 줄은 대강당으로 (실제 견적처럼), 업그레이드 비용은 아래 줄
       return;
     }
+    if (q.halfDayHall) {   // jin 10/20: 오전만·오후만이면 하루 값의 절반
+      var half = Math.round(h.extra * CFG.HALF_DAY_RATE);
+      q.flags.push(name + ' 반나절 대관 — 하루 값의 절반으로 적음, 필요하면 고쳐 주세요');
+      q.extraHalls.push({ name: name + ' (추가)', label: '반나절 대관 ' + q.days + '회 (하루 ' + h.extra.toLocaleString() + '원의 절반)', day: half, qty: q.days, amount: half * q.days });
+      return;
+    }
     q.extraHalls.push({ name: name + ' (추가)', label: '추가 대관 ' + q.days + '일 (하루 ' + h.extra.toLocaleString() + '원)', day: h.extra, qty: q.days, amount: h.extra * q.days });
   });
   // jin 10/21: 성수기(7~8월, 1~2월 금토일·공휴일)엔 200명 미만이 대강당을 쓰면 요청이 없어도 업그레이드비 부과 (131~199명은 인원 때문에 대강당 배정)
@@ -235,6 +248,9 @@ function assignRooms_(q, busy) {
     var up2 = (q.month === 7 || q.month === 8) ? CFG.MAIN_HALL_UPGRADE_SUMMER : CFG.MAIN_HALL_UPGRADE_PEAK;
     q.extraHalls.push({ name: '대강당 업그레이드', label: '성수기 대강당 사용(' + CFG.MAIN_HALL_FREE_PEOPLE + '명 미만)', day: up2, qty: 1, amount: up2 });
     q.flags.push('성수기 대강당 업그레이드 — ' + (up2 / 10000) + '만으로 적음(' + CFG.MAIN_HALL_FREE_PEOPLE + '명 미만, 사람이 때마다 정할 수 있음)');
+  }
+  if (q.earlyLate) {   // jin 10/20: 얼리 체크인·레이트 체크아웃은 한 번에 30만
+    q.extraHalls.push({ name: '얼리·레이트 체크인', label: '얼리 체크인·레이트 체크아웃', day: CFG.EARLY_LATE, qty: 1, amount: CFG.EARLY_LATE });
   }
   if (q.extraRooms && q.nights > 0) {
     var rq = q.extraRooms * q.nights;
