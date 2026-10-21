@@ -57,7 +57,7 @@ assert.equal(run({ adults: 30, checkin: "2026-11-13", nights: 1, customerType: "
 ({ q } = run({ adults: 30, checkin: "2026-11-13", nights: 0, customerType: "church" }));
 assert.equal(q.ondolOnly, 0);
 // 9. jin 10/7 답 64개
-assert.equal(run({ adults: 30, checkin: "2026-11-12", nights: 0 }).q.unit, 43000);   // 목
+assert.equal(run({ adults: 30, checkin: "2026-11-12", nights: 0 }).q.unit, 40000);   // 목 — jin 10/21 카드 4만
 assert.equal(run({ adults: 30, checkin: "2026-11-13", nights: 0 }).q.unit, 47000);   // 금
 assert.equal(run({ adults: 30, checkin: "2026-11-13", nights: 1, customerType: "university", bbq300: true }).q.unit, 45000);   // MT 300g
 assert.equal(run({ adults: 30, checkin: "2026-11-13", nights: 1, customerType: "company", twinRoom: true }).q.unit, 85000);
@@ -75,7 +75,7 @@ console.log("rooms.test 통과");
 {
   const a = run({ adults: 40, checkin: "2026-11-13", nights: 1, customerType: "church", bbq300: true });
   assert.equal(a.q.unit, 70000); assert.equal(a.q.bbq300, true);
-  assert.equal(run({ adults: 40, checkin: "2026-11-11", nights: 0, customerType: "company" }).q.unit, 43000);   // 수
+  assert.equal(run({ adults: 40, checkin: "2026-11-11", nights: 0, customerType: "company" }).q.unit, 40000);   // 수
   assert.equal(run({ adults: 40, checkin: "2026-11-14", nights: 0, customerType: "company" }).q.unit, 47000);   // 토
   const w = run({ adults: 40, checkin: "2027-01-22", nights: 2, customerType: "church", wantsMainHall: true });
   assert.ok(w.q.flags.some((f) => /300만/.test(f)));
@@ -119,7 +119,7 @@ console.log("rooms.test 통과");
   const b = run({ adults: 30, checkin: "2026-11-10", nights: 2, customerType: "university" });
   assert.equal(b.q.unit, 130000, "2박3일 대학 13만");
   const c = run({ adults: 30, checkin: "2026-11-10", nights: 0, customerType: "company" });
-  assert.ok([43000, 47000].includes(c.q.unit), "당일은 끊지 않음");
+  assert.ok([40000, 47000].includes(c.q.unit), "당일은 끊지 않음");
   const d = run({ adults: 30, checkin: "2026-11-10", nights: 1, customerType: "university" });
   assert.equal(d.q.unit, 49000, "MT 는 끊지 않음");
 }
@@ -174,7 +174,7 @@ console.log("rooms.test 통과");
 
 // jin 10/21 가격 답: 회사 2박 15만, 7~8월 평일 1박 −5천, 공휴일 전날 1박 +1만, MT 계약금 상한 없음, 1~2월 대강당 130명+ 100만
 {
-  assert.equal(run({ adults: 30, checkin: "2026-11-11", nights: 2, customerType: "company" }).q.unit, 150000);
+  assert.equal(run({ adults: 30, checkin: "2026-11-11", nights: 2, customerType: "company" }).q.unit, 130000);   // jin 10/21 카드 모두 13만
   assert.equal(run({ adults: 30, checkin: "2027-07-13", nights: 1, customerType: "church" }).q.unit, 80000);   // 화요일
   assert.equal(run({ adults: 30, checkin: "2027-07-16", nights: 1, customerType: "church" }).q.unit, 85000);   // 금요일
   assert.equal(run({ adults: 30, checkin: "2026-12-24", nights: 1, customerType: "church" }).q.unit, 85000);   // 성탄 전날(목)
@@ -191,7 +191,7 @@ console.log("rooms.test 통과");
 }
 { // 10. jin 10/20 가격 답
   const { buildQuote_, priceTotals_ } = await import('../kakao-quote/core.js');
-  assert.equal(buildQuote_({ checkin: '2026-11-17', nights: 2, adults: 20, customerType: 'company' }).unit, 150000);   // Q34 회사 2박3일 15만
+  assert.equal(buildQuote_({ checkin: '2026-11-17', nights: 2, adults: 20, customerType: 'company' }).unit, 130000);   // Q34 15만 → 10/21 카드 모두 13만
   assert.equal(buildQuote_({ checkin: '2026-11-17', nights: 2, adults: 20, customerType: 'church' }).unit, 130000);
   assert.equal(buildQuote_({ checkin: '2026-11-17', nights: 3, adults: 20, customerType: 'church' }).unit, 190000);   // 3박4일 19만
   assert.equal(buildQuote_({ checkin: '2027-01-15', nights: 3, adults: 20, customerType: 'church' }).unit, 210000);   // Q48 1~2월 금 낀 3박4일 21만
