@@ -153,6 +153,8 @@ function buildQuote_(r) {
   if (r.bbq === false && period === '1박2일' && type !== 'university') { unit -= CFG.BBQ_NONE_DROP_1N; flags.push('바베큐 제외 — 1인 ' + CFG.BBQ_NONE_DROP_1N.toLocaleString() + '원 깎음(jin 10/20)'); }
   else if (r.bbq === false && period !== '당일') flags.push('바베큐 제외 요청 — 가격 조정은 사람이 정함');
   // jin 10/21 Q43: 여행사도 같은 단가 — '사람이 확인' 안내 뺌
+  // 10/25 모의 견적: 숙박은 하는데 시설 식사를 전혀 안 먹는 경우도 패키지 단가로 나갔음 → 사람이 정하게 띄움
+  if (r.noMeals && !r.spaceOnly && period !== '당일') flags.push('시설 식사 없이 숙박만 — 가격은 사람이 정함(지금 단가는 식사 포함 패키지 기준)');
   if (r.spaceOnly) flags.push('숙박·식사 없이 공간만 대관 — 가격은 사람이 정함(jin 10/20, 지금 단가는 패키지 기준)');
   if (kids > 0) flags.push('초등 이하 ' + kids + '명 — 할인 금액은 사람이 정함(참고 jin 10/20: 2박 이상이면 미취학 무료·초등 −2만)');
   var skip = Number(r.skipMeals) || 0;
@@ -279,11 +281,16 @@ var YOUNG_RE_ = /청년|대학부|고등부|중고등|중등부|학생부|청소
 // 동호회·클럽·선수단·협회처럼 성격만 '모임'인 곳은 기본 3인1실 온돌.
 var SOCIAL_RE_ = /동창|동문|가족|친구|야유회/;
 var ASK_PENSION_RE_ = /펜션|단체\s*실|단체\s*룸/;
+// 10/25 모의 견적: '펜션동 미사용'처럼 안 쓴다는 말까지 펜션 요청으로 잡아 옵션이 나갔음 → 부정 표현은 지우고 본다
+export function asksPension_(t) {
+  t = String(t || '').replace(/(펜션\s*동?|단체\s*실|단체\s*룸)\s*(은|는|도)?\s*(미사용|사용\s*안|사용하지\s*않|안\s*씀|불필요|필요\s*없|제외|빼)/g, '');
+  return ASK_PENSION_RE_.test(t);
+}
 function roomOptions_(q) {
   if (q.wantsPension) return true;
   if (q.type === 'university') return true;    // 대학생·MT
   var t = (q.org || '') + ' ' + (q.notes || '');
-  return YOUNG_RE_.test(t) || SOCIAL_RE_.test(t) || ASK_PENSION_RE_.test(q.notes || '');
+  return YOUNG_RE_.test(t) || SOCIAL_RE_.test(t) || asksPension_(q.notes || '');
 }
 
 // 공휴일 (콜로그 Config.gs HOLIDAYS_ 와 같은 목록, 1~2월 성수기 판단용) — 새 해가 오면 더한다

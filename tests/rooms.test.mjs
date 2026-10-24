@@ -210,3 +210,14 @@ console.log("rooms.test 통과");
   assert.equal(priceTotals_(mt).deposit, 1500000);
   console.log('10/20 가격 답 통과');
 }
+
+// 10/25 모의 견적: '펜션동 미사용'은 펜션 요청 아님, 식사 없는 숙박은 사람이 정함
+{
+  const { asksPension_ } = await import("../kakao-quote/core.js");
+  assert.equal(asksPension_("본관 호텔형 객실 15실 (펜션동 미사용)"), false);
+  assert.equal(asksPension_("강당 미사용, 펜션동은 필요 없음"), false);
+  assert.equal(asksPension_("독채 펜션 1동 통임대"), true);
+  assert.equal(asksPension_("단체실 원해요"), true);
+  assert.ok(run({ adults: 30, checkin: "2026-11-16", nights: 2, customerType: "group", noMeals: true }).q.flags.some((f) => /식사 없이 숙박만/.test(f)));
+  console.log('10/25 모의 견적 수정 통과');
+}

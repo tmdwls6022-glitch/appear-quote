@@ -25,7 +25,7 @@
 //   (QUOTE_SHEET_ID 는 10/18부터 안 씀 — 시트는 코드의 QUOTE_SHEET)
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { buildQuote_, assignRooms_, busyFromBookings_, scheduleLine_ } from "./core.js";
+import { buildQuote_, assignRooms_, busyFromBookings_, scheduleLine_, asksPension_ } from "./core.js";
 import { CFG } from "./core.js";
 import { writeQuote, exportPdf, readAdjust, deleteTabs, templateTabs } from "./sheet.ts";
 import { parseEdit_, applyAdjust_, describe_, diff_ } from "./adjust.js";
@@ -139,7 +139,7 @@ async function parseRequest(text: string, asof?: string, variant?: string) {
     "bbq(true면 바베큐 원함, false면 원하지 않음/제외, null이면 언급 없음),",
     "twinRoom(2인1실 원하면 true), wantsPension(펜션·다인실 원하면 true), bbq300(바베큐 300g 원하면 true), vatDoc(세금계산서·현금영수증·카드결제 언급 시 true),",
     'extraHalls(추가로 쓰고 싶다는 강당 이름 배열, 예 ["1강당"]), wantsMainHall(대강당 원하면 true), extraRooms(객실을 몇 실 더 원하는지 숫자, 없으면 0), skipMeals(기본 패키지에서 빼 달라는 식사 끼니 수, 없으면 0),',
-    'halfDayHall(강당을 오전만·오후만·반나절만 쓰면 true), earlyLate(정해진 입실보다 일찍 들어오거나 퇴실보다 늦게 나가길 원하면 true), spaceOnly(숙박도 식사도 없이 강당·운동장 같은 공간만 빌리면 true),',
+    'halfDayHall(강당을 오전만·오후만·반나절만 쓰면 true), earlyLate(정해진 입실보다 일찍 들어오거나 퇴실보다 늦게 나가길 원하면 true), spaceOnly(숙박도 식사도 없이 강당·운동장 같은 공간만 빌리면 true), noMeals(숙박은 하지만 시설 식사를 한 끼도 안 먹으면 true),',
     'notes(그 밖의 요청 한 줄), unsure(확실하지 않은 점 배열, 예: "날짜 후보가 2개"),',
     'specials(기본 패키지에 없는 특별 요청 배열, 짧게. 예 ["전문 MC·음향 오퍼레이터", "심야 야식 조리"]. 없으면 []).',
     ...(variant === "v1" ? [] : ["", ...RULES]),
@@ -238,7 +238,7 @@ const TEST_TAG = "🧪시험 ";
 async function makeQuote(text: string, adj: { req: any; replaceGid: number | null; note: string; test?: boolean } | null = null, asof?: string, test = false) {
   const req = adj ? adj.req : await parseRequest(text, asof);
   // jin 10/20: 펜션 옵션은 요청글에 '펜션(동)'·'단체실(룸)'이라고 쓴 경우만 — AI가 '독채'·'온돌방'으로 짐작하지 않게 글에서 직접 본다
-  if (!adj) req.wantsPension = /펜션|단체\s*실|단체\s*룸/.test(text);
+  if (!adj) req.wantsPension = asksPension_(text);   // 10/25: '펜션동 미사용' 같은 부정은 빼고 봄
   const q: any = buildQuote_(req);
   if (test || adj?.test) q.org = TEST_TAG + q.org;   // jin 10/18: 시험 탭은 이름으로 구분(시험지우기로 한꺼번에 지움)
   let bookings: any[] = [];
