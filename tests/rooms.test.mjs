@@ -221,3 +221,17 @@ console.log("rooms.test 통과");
   assert.ok(run({ adults: 30, checkin: "2026-11-16", nights: 2, customerType: "group", noMeals: true }).q.flags.some((f) => /식사 없이 숙박만/.test(f)));
   console.log('10/25 모의 견적 수정 통과');
 }
+
+// jin 10/25 질문 답: 공공기관 부가세 없음, 일부 2인1실, 소회의실=1강당 값, 펜션 통임대, 트럭 주차 불가
+{
+  let x = run({ adults: 30, checkin: "2026-11-16", nights: 1, customerType: "group", publicOrg: true, vatDoc: true });
+  assert.equal(x.q.vat, false);
+  x = run({ adults: 36, checkin: "2026-11-12", nights: 1, customerType: "company", twinPart: 2 });
+  assert.equal(x.q.unit, 75000); assert.equal(x.q.extraHalls.find((h) => h.name === "2인1실 추가").amount, 40000);
+  x = run({ adults: 30, checkin: "2026-11-23", nights: 4, customerType: "company", extraHalls: ["분임토의실 3실"] });
+  assert.equal(x.q.extraHalls[0].amount, 300000 * 3 * 4);
+  x = run({ adults: 20, checkin: "2026-11-21", nights: 1, customerType: "group", wantsPension: true, noMeals: true });
+  assert.ok(x.q.flags.some((f) => /1동 1박 800,000원/.test(f)));
+  assert.ok(run({ adults: 30, checkin: "2026-11-16", nights: 1, bigTruck: true }).q.flags.some((f) => /트럭/.test(f)));
+  console.log('10/25 질문 답 통과');
+}

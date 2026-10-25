@@ -24,6 +24,7 @@ export const CFG = {
   PENSION_CAP: 25,
   ONDOL_ROOMS: 90, BED_ROOMS: 6,                       // jin 10/7: 본관동 96실 = 온돌 90 + 침대 6
   PENSION_EXTRA: 150000,
+  PENSION_RENT_BASE: 600000, PENSION_RENT_BASE_PEOPLE: 10, PENSION_RENT_PER: 20000, PENSION_RENT_MAX: 1000000,   // jin 10/25: 펜션 통임대 1동 1박 10명 60만, +1명 2만, 최대 100만
   PEAK_1N: 10000,                                      // 1박2일 7~8월 1인 추가
   TWIN_PER_NIGHT: 10000,                               // 2인1실 1인 1박당 추가 — jin 10/3
   MEAL_DROP: 8000,                                     // 식사 1끼 빼면 1인 −8천(모든 일정), 7~8월 불가 — jin 10/3 −1만 → 10/20 Q12 '가' −8천
@@ -178,6 +179,10 @@ function buildQuote_(r) {
 
   var days = Math.max(1, nights); // 강당 대관 "하루" = 박 수
   var vat = !!r.vatDoc || type === 'company' || type === 'agency';   // jin 10/7: 대학원·사이버대·야간대(adultuniv)는 회사 단가지만 부가세 없음·기본 계좌
+  if (r.publicOrg) { vat = false; flags.push('공공기관·학교 — 부가세 없음(jin 10/25)'); }
+  if (r.bigTruck) flags.push('5톤 등 대형 트럭 주차·반입은 불가 — 고객에게 안내(jin 10/25)');
+  // jin 10/25: 펜션동만 통임대(식사 없음)는 1동 1박 10명까지 60만, 1명 더할 때 +2만, 최대 100만
+  if (r.wantsPension && r.noMeals && nights > 0) { var pr = Math.min(CFG.PENSION_RENT_MAX, CFG.PENSION_RENT_BASE + Math.max(0, people - CFG.PENSION_RENT_BASE_PEOPLE) * CFG.PENSION_RENT_PER); flags.push('펜션 통임대(식사 없음) — 1동 1박 ' + pr.toLocaleString() + '원 × ' + nights + '박 = ' + (pr * nights).toLocaleString() + '원 기준(jin 10/25), 패키지 단가 대신 이 금액으로 고쳐 주세요'); }
   if (!vat) flags.push('입금 계좌를 ' + CFG.ACC_DEFAULT + '(으)로 적음 — 이번 달 계좌가 다르면 바꿔 주세요(신향수·김은하·김홍철 계좌도 있음)');   // jin 10/19
 
   return {
@@ -186,6 +191,7 @@ function buildQuote_(r) {
     checkin: r.checkin || null, checkout: r.checkout || null, scheduleText: r.scheduleText || '',
     type: type, unit: unit, tplKey: tpl, pkgName: pkgName, bbq: bbq, vat: vat,
     twin: !!r.twinRoom, wantsMainHall: !!r.wantsMainHall, wantsPension: !!r.wantsPension, bbq300: !!r.bbq300, halfDayHall: !!r.halfDayHall, earlyLate: !!r.earlyLate, extraHallsWanted: r.extraHalls || [], extraRooms: Number(r.extraRooms) || 0, skipMeals: Number(r.skipMeals) || 0, month: month,
+    spaceOnly: !!r.spaceOnly, twinPart: Number(r.twinPart) || 0,
     notes: r.notes || '', flags: flags, lines: [], extras: []
   };
 }
@@ -209,8 +215,9 @@ function assignRooms_(q, busy) {
   for (var i = order.indexOf(want); i < order.length; i++) {
     if (!busy.halls[order[i]]) { hall = order[i]; break; }
   }
-  if (!hall) { hall = want; q.flags.push(want + ' 이후 큰 강당이 모두 예약돼 있음 — 확인 필요'); }
-  else if (hall !== want) q.flags.push(want + '이(가) 예약돼 있어 ' + hall + '(으)로 배정');
+  // jin 10/25: 원하는 강당이 차 있으면 다음 큰 강당으로 — 날짜를 바꿀 수 있는지도 고객에게 물어봄
+  if (!hall) { hall = want; q.flags.push(want + ' 이후 큰 강당이 모두 예약돼 있음 — 확인 필요, 날짜 변경 가능한지 물어보기'); }
+  else if (hall !== want) q.flags.push(want + '이(가) 예약돼 있어 ' + hall + '(으)로 배정 — 날짜 변경 가능한지도 물어보기');
   q.hall = hall;
   // jin 10/11 카드: 2·3강당은 'OR' 로 적지 않고 비는 쪽 하나로 정해 적음 (이전 10/7 규칙 대체)
 
@@ -222,6 +229,12 @@ function assignRooms_(q, busy) {
   wanted.forEach(function (n) {
     var name = String(n).replace(/\s/g, '').replace(/^대강당$/, '독립대강당');
     var h = hallInfo_(name);
+    // jin 10/25 Q25: 소회의실·분임토의실·소연습실 추가는 1강당 값으로(방 수 × 일 수)
+    if (!h && /회의실|토의실|연습실|세미나실|소강당/.test(name)) {
+      var small = hallInfo_('1강당'), cnt = Number((name.match(/(\d+)\s*(실|개)/) || [])[1]) || 1;
+      q.extraHalls.push({ name: String(n).replace(/\s*\d+\s*(실|개)\s*$/, '') + ' (추가)', label: cnt + '실 × ' + q.days + '일 (1실 하루 ' + small.extra.toLocaleString() + '원, 1강당 값)', day: small.extra, qty: cnt * q.days, amount: small.extra * cnt * q.days });
+      return;
+    }
     if (!h) { q.flags.push('추가 강당 "' + n + '"을(를) 못 알아봄'); return; }
     if (name === hall || seen[name]) return; seen[name] = 1;
     if (busy.halls[name]) q.flags.push('추가 요청한 ' + name + '은(는) 그날 예약 있음');
@@ -254,6 +267,10 @@ function assignRooms_(q, busy) {
   if (q.earlyLate) {   // jin 10/20: 얼리 체크인·레이트 체크아웃은 한 번에 30만
     q.extraHalls.push({ name: '얼리·레이트 체크인', label: '얼리 체크인·레이트 체크아웃', day: CFG.EARLY_LATE, qty: 1, amount: CFG.EARLY_LATE });
   }
+  // jin 10/25 Q12: 당일에 숙박·식사 없이 공간만 쓰면 강당 하루 대관료만
+  if (q.spaceOnly && q.nights === 0) { var hi = hallInfo_(q.hall === '대강당' ? '독립대강당' : q.hall); if (hi) q.flags.push('공간만 대관(당일) — 1인 단가 대신 ' + q.hall + ' 하루 대관료 ' + hi.extra.toLocaleString() + '원으로 고쳐 주세요(jin 10/25)'); }
+  // jin 10/25 Q17: 일부만 2인1실이면 기본 단가 + 그 방 인원만 1인 1박 +1만
+  if (q.twinPart > 0 && !q.twin && q.nights > 0) { var tq = q.twinPart * 2 * q.nights; q.extraHalls.push({ name: '2인1실 추가', label: q.twinPart + '실(' + (q.twinPart * 2) + '명) × ' + q.nights + '박 (1인 1박 ' + CFG.TWIN_PER_NIGHT.toLocaleString() + '원)', day: CFG.TWIN_PER_NIGHT, qty: tq, amount: CFG.TWIN_PER_NIGHT * tq }); }
   if (q.extraRooms && q.nights > 0) {
     var rq = q.extraRooms * q.nights;
     q.extraHalls.push({ name: '객실 추가', label: q.extraRooms + '실 × ' + q.nights + '박 (1실 ' + CFG.ROOM_EXTRA.toLocaleString() + '원)', day: CFG.ROOM_EXTRA, qty: rq, amount: CFG.ROOM_EXTRA * rq });
