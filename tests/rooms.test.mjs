@@ -267,3 +267,11 @@ console.log("rooms.test 통과");
   const q2 = buildQuote_({ adults: 30, kids: 3, preschool: 3, checkin: "2026-11-13", nights: 2, customerType: "church" });
   assert.equal(q2.preschool, 0);
   console.log('캠프파이어·미취학 통과'); }
+
+// 10/25: 펜션이 모두 예약돼 있으면 객실 옵션 없이 온돌 한 가지
+{
+  const b = [{ name: "x", checkin: "2027-07-30", checkout: "2027-08-01", halls: [], pensions: ["A", "B", "C"] }];
+  const { q: z } = run({ org: "○○교회 고등부", adults: 70, checkin: "2027-07-30", nights: 2, customerType: "church" }, b);
+  assert.equal(z.roomOptions, false);
+  console.log('펜션 다 참 통과');
+}

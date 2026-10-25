@@ -308,6 +308,7 @@ function assignRooms_(q, busy) {
   var free = ['A', 'B', 'C'].filter(function (d) { return !busy.pensions[d]; });
   if (free.length < need) q.flags.push('펜션 ' + need + '동 필요한데 ' + free.length + '동만 비어 있음');
   q.pensions = free.slice(0, need);
+  if (need && !q.pensions.length) q.roomOptions = false;   // 10/25 모의: 펜션이 다 차 있으면 '①펜션 없음+온돌' 대신 온돌 한 가지로
   var inPension = q.pensions.reduce(function (n, d) { return n + (CFG.PENSION_CAPS[d] || CFG.PENSION_CAP); }, 0);   // jin 10/25: A·B 30명, C 35명
   q.ondol = Math.max(0, Math.ceil((q.people - inPension) / (q.twin ? 2 : 3)));
   q.ondolOnly = Math.ceil(q.people / (q.twin ? 2 : 3));   // 객실옵션 2: 펜션 없이 온돌만으로 전원
