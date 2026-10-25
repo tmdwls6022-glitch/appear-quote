@@ -28,6 +28,7 @@ export const CFG = {
   BBQ_EXTRA: 25000,                                    // jin 10/25: 바베큐 한 번 더 1인 +2.5만
   GRILL_SET: 30000,                                    // jin 10/25: 숯·그릴 1세트 대여 3만
   SINGLE_ROOM: 30000,                                  // jin 10/25: 1인 1실 1인 1박 +3만(더 정할 예정)
+  CAMPFIRE: 300000,                                    // jin 10/20·10/25 Q30: 캠프파이어 세팅 30만
   PRESCHOOL_DROP_SHORT: 25000,                         // jin 10/25: 2박 미만 미취학 1인 −2.5만
   ONDOL_ROOMS: 90, BED_ROOMS: 6,                       // jin 10/7: 본관동 96실 = 온돌 90 + 침대 6
   PENSION_EXTRA: 150000,
@@ -204,7 +205,7 @@ function buildQuote_(r) {
     checkin: r.checkin || null, checkout: r.checkout || null, scheduleText: r.scheduleText || '',
     type: type, unit: unit, tplKey: tpl, pkgName: pkgName, bbq: bbq, vat: vat,
     twin: !!r.twinRoom, wantsMainHall: !!r.wantsMainHall, wantsPension: !!r.wantsPension, bbq300: !!r.bbq300, halfDayHall: !!r.halfDayHall, earlyLate: !!r.earlyLate, extraHallsWanted: r.extraHalls || [], extraRooms: Number(r.extraRooms) || 0, skipMeals: Number(r.skipMeals) || 0, month: month,
-    spaceOnly: !!r.spaceOnly, twinPart: Number(r.twinPart) || 0, addMeals: Number(r.addMeals) || 0, extraBbq: Number(r.extraBbq) || 0, grillSets: Number(r.grillSets) || 0, singleRooms: Number(r.singleRooms) || 0,
+    spaceOnly: !!r.spaceOnly, twinPart: Number(r.twinPart) || 0, addMeals: Number(r.addMeals) || 0, extraBbq: Number(r.extraBbq) || 0, grillSets: Number(r.grillSets) || 0, singleRooms: Number(r.singleRooms) || 0, campfire: !!r.campfire, preschool: nights < 2 ? Math.min(kids, Number(r.preschool) || 0) : 0,
     notes: r.notes || '', flags: flags, lines: [], extras: []
   };
 }
@@ -269,6 +270,7 @@ function assignRooms_(q, busy) {
       q.extraHalls.push({ name: name + ' (추가)', label: '반나절 대관 ' + q.days + '회 (하루 ' + h.extra.toLocaleString() + '원의 절반)', day: half, qty: q.days, amount: half * q.days });
       return;
     }
+    q.flags.push(name + ' 추가(강당 2개 동시) — 금액은 사람이 정함(jin 10/25 Q63, 지금은 추가 대관료로 적음)');
     q.extraHalls.push({ name: name + ' (추가)', label: '추가 대관 ' + q.days + '일 (하루 ' + h.extra.toLocaleString() + '원)', day: h.extra, qty: q.days, amount: h.extra * q.days });
   });
   // jin 10/21: 성수기(7~8월, 1~2월 금토일·공휴일)엔 200명 미만이 대강당을 쓰면 요청이 없어도 업그레이드비 부과 (131~199명은 인원 때문에 대강당 배정)
@@ -288,6 +290,9 @@ function assignRooms_(q, busy) {
   if (q.addMeals > 0) q.extraHalls.push({ name: '식사 추가', label: q.addMeals + '끼 × ' + q.people + '명 (1인 1끼 ' + CFG.MEAL_ADD.toLocaleString() + '원)', day: CFG.MEAL_ADD, qty: q.addMeals * q.people, amount: CFG.MEAL_ADD * q.addMeals * q.people });
   if (q.extraBbq > 0) q.extraHalls.push({ name: '바베큐 추가', label: q.extraBbq + '회 × ' + q.people + '명 (1인 ' + CFG.BBQ_EXTRA.toLocaleString() + '원)', day: CFG.BBQ_EXTRA, qty: q.extraBbq * q.people, amount: CFG.BBQ_EXTRA * q.extraBbq * q.people });
   if (q.grillSets > 0) q.extraHalls.push({ name: '숯·그릴 대여', label: q.grillSets + '세트 (1세트 ' + CFG.GRILL_SET.toLocaleString() + '원)', day: CFG.GRILL_SET, qty: q.grillSets, amount: CFG.GRILL_SET * q.grillSets });
+  // jin 10/25 Q30·Q34: 캠프파이어 세팅 30만, 2박 미만 미취학 1인 −2.5만(따로 한 줄)
+  if (q.campfire) q.extraHalls.push({ name: '캠프파이어', label: '캠프파이어 세팅', day: CFG.CAMPFIRE, qty: 1, amount: CFG.CAMPFIRE });
+  if (q.preschool > 0) q.extraHalls.push({ name: '미취학 할인', label: '미취학 ' + q.preschool + '명 (1인 ' + CFG.PRESCHOOL_DROP_SHORT.toLocaleString() + '원)', day: -CFG.PRESCHOOL_DROP_SHORT, qty: q.preschool, amount: -CFG.PRESCHOOL_DROP_SHORT * q.preschool });
   if (q.singleRooms > 0 && q.nights > 0) { var sq = q.singleRooms * q.nights; q.extraHalls.push({ name: '1인 1실 추가', label: q.singleRooms + '명 × ' + q.nights + '박 (1인 1박 ' + CFG.SINGLE_ROOM.toLocaleString() + '원)', day: CFG.SINGLE_ROOM, qty: sq, amount: CFG.SINGLE_ROOM * sq }); q.flags.push('1인 1실 추가금 1박 3만은 임시(jin 10/25 더 정할 예정)'); }
   if (q.extraRooms && q.nights > 0) {
     var rq = q.extraRooms * q.nights;
@@ -308,7 +313,7 @@ function assignRooms_(q, busy) {
   q.ondolOnly = Math.ceil(q.people / (q.twin ? 2 : 3));   // 객실옵션 2: 펜션 없이 온돌만으로 전원
   // jin 10/7: 본관동 96실 = 온돌룸 90 + 침대룸 6
   var maxRooms = q.roomOptions ? q.ondol : q.ondolOnly;
-  if (maxRooms > CFG.ONDOL_ROOMS) q.flags.push('온돌 ' + maxRooms + '실 필요 — 본관 온돌은 ' + CFG.ONDOL_ROOMS + '실뿐(침대룸 ' + CFG.BED_ROOMS + '실·펜션 포함해 배치 확인)');
+  if (maxRooms > CFG.ONDOL_ROOMS) q.flags.push('온돌 ' + maxRooms + '실 필요 — 본관 온돌 ' + CFG.ONDOL_ROOMS + '실에 침대룸 ' + CFG.BED_ROOMS + '실·펜션까지 채움(jin 10/25 Q58), 배치 확인');
 }
 
 var YOUNG_RE_ = /청년|대학부|고등부|중고등|중등부|학생부|청소년|\bMT\b|엠티/i;

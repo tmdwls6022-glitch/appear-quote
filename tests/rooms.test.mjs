@@ -99,7 +99,7 @@ console.log("rooms.test 통과");
   console.log("rooms.test 9 통과");
 }
 { // 10. 온돌 90실 한도
-  const f = (n) => run({ adults: n, checkin: "2026-11-13", nights: 1, customerType: "church" }).q.flags.some((x) => /온돌 90실뿐|90실뿐/.test(x));
+  const f = (n) => run({ adults: n, checkin: "2026-11-13", nights: 1, customerType: "church" }).q.flags.some((x) => /본관 온돌 90실에 침대룸/.test(x));
   assert.equal(f(270), false); assert.equal(f(273), true);
   console.log("rooms.test 10 통과");
 }
@@ -257,3 +257,13 @@ console.log("rooms.test 통과");
   assert.equal(run({ adults: 30, checkin: "2027-10-11", nights: 0, customerType: "church" }).q.unit, 47000);    // 한글날 대체(월)
   console.log('10/25 금액 답 통과');
 }
+
+// jin 10/25 Q30·Q34: 캠프파이어 30만, 2박 미만 미취학 −2.5만 줄
+{ const { buildQuote_, assignRooms_ } = await import("../kakao-quote/core.js");
+  const q = buildQuote_({ adults: 30, kids: 3, preschool: 3, checkin: "2026-11-13", nights: 1, customerType: "church", campfire: true });
+  assignRooms_(q, { halls: {}, pensions: {} });
+  const names = q.extraHalls.map((h) => h.name + ":" + h.amount);
+  assert.ok(names.includes("미취학 할인:-75000") && names.includes("캠프파이어:300000"), names.join());
+  const q2 = buildQuote_({ adults: 30, kids: 3, preschool: 3, checkin: "2026-11-13", nights: 2, customerType: "church" });
+  assert.equal(q2.preschool, 0);
+  console.log('캠프파이어·미취학 통과'); }
