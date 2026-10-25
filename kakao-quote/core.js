@@ -42,6 +42,7 @@ export const CFG = {
   HOLIDAY_EVE_1N: 10000,               // jin 10/21 Q39: 연휴·공휴일 전날 묵는 1박2일 1인 +1만(7~8월처럼)
   PEAK_WEEKDAY_DROP_1N: 5000,          // jin 10/21 Q38: 7~8월 평일 1박2일은 1인 −5천
   MAIN_HALL_UPGRADE_PEAK: 3000000,   // jin 10/21 Q40 '다': 1~2월 금·토·일·공휴일도 300만 (10/7 150~300만, 10/21 '130명+ 100만' 답을 대체)
+  MAIN_HALL_MIN_PEOPLE: 150,         // jin 10/25: 독립대강당은 150명 이상 팀에만 (작은 강당이 차도 대강당으로 올리지 않음)
   MAIN_HALL_FREE_PEOPLE: 200,        // jin 10/21: 성수기 대강당 업그레이드비는 200명 이상 단체 아니면 무조건 부과 — 견적은 사람이 때마다 다르게 할 수 있음
   HALF_DAY_RATE: 0.5,                // jin 10/20: 강당 오전만·오후만은 하루 대관료의 절반(필요하면 사람이 고침)
   EARLY_LATE: 300000,                // jin 10/20: 얼리 체크인·레이트 체크아웃 한 번에 30만
@@ -227,6 +228,8 @@ function assignRooms_(q, busy) {
   var hall = null;
   if (!want) { q.flags.push(q.people + '명은 대강당 한도(300명) 초과 — 강당 확인 필요'); want = '독립대강당'; }
   for (var i = order.indexOf(want); i < order.length; i++) {
+    // jin 10/25: 독립대강당은 막 주지 않음 — 150명 이상 팀(또는 대강당을 콕 집어 원한 팀)만. 작은 강당이 차 있어도 대강당으로 올리지 않는다
+    if (order[i] === '독립대강당' && want !== '독립대강당' && q.people < CFG.MAIN_HALL_MIN_PEOPLE && !q.wantsMainHall) break;
     if (!busy.halls[order[i]]) { hall = order[i]; break; }
   }
   // jin 10/25: 원하는 강당이 차 있으면 다음 큰 강당으로 — 날짜를 바꿀 수 있는지도 고객에게 물어봄

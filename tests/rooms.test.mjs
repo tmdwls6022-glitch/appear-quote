@@ -281,3 +281,13 @@ console.log("rooms.test 통과");
   assert.equal(hs.roomOptions, false); assert.deepEqual(hs.pensions, []);
   console.log('고등부 펜션 없음 통과');
 }
+
+// 10/25 jin: 4강당이 차 있어도 150명 미만은 대강당으로 올리지 않음(업그레이드비도 없음)
+{
+  const b = [{ name: "x", checkin: "2027-07-30", checkout: "2027-08-01", halls: ["4강당"], pensions: [] }];
+  const { q: h } = run({ org: "○○교회", adults: 70, checkin: "2027-07-30", nights: 2, customerType: "church" }, b);
+  assert.equal(h.hall, "4강당"); assert.equal(h.extraHalls.length, 0); assert.ok(h.flags.some((f) => /날짜 변경/.test(f)));
+  const { q: h2 } = run({ org: "○○교회", adults: 160, checkin: "2026-11-13", nights: 1, customerType: "church" });
+  assert.equal(h2.hall, "독립대강당");
+  console.log('대강당 150명 통과');
+}
