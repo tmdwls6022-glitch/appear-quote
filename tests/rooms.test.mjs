@@ -17,7 +17,7 @@ for (const r of [
 ]) {
   ({ q } = run({ ...r, adults: 60, checkin: "2026-11-13", nights: 1 }));
   assert.equal(q.roomOptions, true, r.org);
-  assert.deepEqual(q.pensions, ["A"]); assert.equal(q.ondol, 12); assert.equal(q.ondolOnly, 20);   // 펜션 1동(25명) + 온돌 35명/3
+  assert.deepEqual(q.pensions, ["A"]); assert.equal(q.ondol, 10); assert.equal(q.ondolOnly, 20);   // 펜션 A동(30명, jin 10/25) + 온돌 35명/3
 }
 // 펜션 수: 10명 이상이면 1동만(jin 10/7 Q17·18)
 for (const [n, k] of [[9, 0], [10, 1], [39, 1], [40, 1], [69, 1], [70, 1]]) {
@@ -243,4 +243,17 @@ console.log("rooms.test 통과");
   assert.equal(hasWeekendNight_("2026-11-16", 1), false);
   assert.equal(buildQuote_({ checkin: "2027-08-01", nights: 1, adults: 30, customerType: "church" }).unit, 85000);
   console.log('일요일 밤 주말 통과');
+}
+
+// jin 10/25 금액 답: 식사 추가 1.2만·바베큐 추가 2.5만·그릴 3만·1인1실 3만(줄 따로), 2박 바베큐 빼면 −1만, 설·추석 연휴 성수기, 공휴일 당일 주말 단가
+{
+  let x = run({ adults: 20, checkin: "2026-11-26", nights: 1, customerType: "company", addMeals: 1, grillSets: 2, singleRooms: 2 });
+  const amt = (n) => (x.q.extraHalls.find((h) => h.name === n) || {}).amount;
+  assert.equal(x.q.unit, 75000); assert.equal(amt("식사 추가"), 240000); assert.equal(amt("숯·그릴 대여"), 60000); assert.equal(amt("1인 1실 추가"), 60000);
+  x = run({ adults: 20, checkin: "2026-11-16", nights: 2, customerType: "church", extraBbq: 1 });
+  assert.equal(amt("바베큐 추가"), 500000);
+  assert.equal(run({ adults: 30, checkin: "2026-11-16", nights: 2, customerType: "church", bbq: false }).q.unit, 120000);
+  assert.equal(run({ adults: 30, checkin: "2027-09-14", nights: 2, customerType: "church" }).q.unit, 150000);   // 추석
+  assert.equal(run({ adults: 30, checkin: "2027-10-11", nights: 0, customerType: "church" }).q.unit, 47000);    // 한글날 대체(월)
+  console.log('10/25 금액 답 통과');
 }

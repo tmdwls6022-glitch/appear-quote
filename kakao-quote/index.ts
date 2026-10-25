@@ -141,7 +141,7 @@ async function parseRequest(text: string, asof?: string, variant?: string) {
     "bbq(true면 바베큐 원함, false면 원하지 않음/제외, null이면 언급 없음),",
     "twinRoom(2인1실 원하면 true), wantsPension(펜션·다인실 원하면 true), bbq300(바베큐 300g 원하면 true), vatDoc(세금계산서·현금영수증·카드결제 언급 시 true),",
     'extraHalls(추가로 쓰고 싶다는 강당 이름 배열, 예 ["1강당"]), wantsMainHall(대강당 원하면 true), extraRooms(객실을 몇 실 더 원하는지 숫자, 없으면 0), skipMeals(기본 패키지에서 빼 달라는 식사 끼니 수, 없으면 0),',
-    'halfDayHall(강당을 오전만·오후만·반나절만 쓰면 true), earlyLate(정해진 입실보다 일찍 들어오거나 퇴실보다 늦게 나가길 원하면 true), spaceOnly(숙박도 식사도 없이 강당·운동장 같은 공간만 빌리면 true), publicOrg(관공서·공공기관·학교 행정실이면 true), twinPart(일부만 2인1실이면 그 방 수, 없으면 0), bigTruck(5톤·탑차 같은 대형 트럭 주차를 원하면 true), noMeals(숙박은 하지만 시설 식사를 한 끼도 안 먹으면 true),',
+    'halfDayHall(강당을 오전만·오후만·반나절만 쓰면 true), earlyLate(정해진 입실보다 일찍 들어오거나 퇴실보다 늦게 나가길 원하면 true), spaceOnly(숙박도 식사도 없이 강당·운동장 같은 공간만 빌리면 true), publicOrg(관공서·공공기관·학교 행정실이면 true), twinPart(일부만 2인1실이면 그 방 수, 없으면 0), bigTruck(5톤·탑차 같은 대형 트럭 주차를 원하면 true), noMeals(숙박은 하지만 시설 식사를 한 끼도 안 먹으면 true), addMeals(기본 패키지보다 더 먹는 끼니 수, 예 1박에 첫날 점심 추가면 1, 없으면 0), extraBbq(기본 1번 말고 바베큐를 더 하는 횟수, 없으면 0), grillSets(숯·그릴만 빌리는 세트 수, 없으면 0), singleRooms(1인 1실을 원하는 사람 수, 없으면 0), pets(반려동물 동반이면 true), specialDiet(채식·고단백·육류 위주 같은 특별 식단이면 그 내용 짧게, 없으면 null),',
     'notes(그 밖의 요청 한 줄), unsure(확실하지 않은 점 배열, 예: "날짜 후보가 2개"),',
     'specials(기본 패키지에 없는 특별 요청 배열, 짧게. 예 ["전문 MC·음향 오퍼레이터", "심야 야식 조리"]. 없으면 []).',
     ...(variant === "v1" ? [] : ["", ...RULES]),
