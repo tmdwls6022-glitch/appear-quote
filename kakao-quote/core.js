@@ -300,7 +300,7 @@ function assignRooms_(q, busy) {
   }
 
   // 객실 — jin 10/7: 기본은 3인1실 온돌만. 객실옵션 1(펜션+온돌)·2(온돌만)는 펜션·다인실을 요청했거나,
-  // 젊은 층(MT·청년부·대학부·중고등부), 친목 모임(가족·동창·동호회)일 때만.
+  // 젊은 층(MT·청년부·대학부), 친목 모임(가족·동창·야유회)일 때만 (10/25 jin: 중고등부 뺌).
   q.roomOptions = q.nights > 0 && roomOptions_(q);   // 당일은 객실 없음 — 옵션·온돌 줄 확인 표시도 안 띄움 (10/10)
   var need = !q.roomOptions ? 0 : q.people < 10 ? 0 : 1;   // jin 10/7 Q17·18: 펜션은 1동만(더 필요하면 사람이 정함)
   if (q.nights === 0) { q.pensions = []; q.ondol = 0; q.ondolOnly = 0; return; }             // 당일: 숙박 없음
@@ -317,7 +317,8 @@ function assignRooms_(q, busy) {
   if (maxRooms > CFG.ONDOL_ROOMS) q.flags.push('온돌 ' + maxRooms + '실 필요 — 본관 온돌 ' + CFG.ONDOL_ROOMS + '실에 침대룸 ' + CFG.BED_ROOMS + '실·펜션까지 채움(jin 10/25 Q58), 배치 확인');
 }
 
-var YOUNG_RE_ = /청년|대학부|고등부|중고등|중등부|학생부|청소년|\bMT\b|엠티/i;
+// jin 10/25: 펜션 옵션은 jin 10/20 목록(야유회·대학생·청년부·MT·가족모임 + '펜션·단체실' 요청)만 — 중고등부·학생부·청소년은 빼고 3인1실 온돌 한 가지
+var YOUNG_RE_ = /청년|대학부|\bMT\b|엠티/i;
 // jin 10/20: 펜션동(객실옵션 1·2)은 야유회 성격·대학생·청년부·MT·가족모임 같은 곳, 그리고 요청에 단체실·펜션동을 쓴다고 한 곳만.
 // 동호회·클럽·선수단·협회처럼 성격만 '모임'인 곳은 기본 3인1실 온돌.
 var SOCIAL_RE_ = /동창|동문|가족|친구|야유회/;

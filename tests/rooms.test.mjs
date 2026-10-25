@@ -7,10 +7,9 @@ const run = (r, bookings = []) => { const q = buildQuote_(r); assignRooms_(q, bu
 let { q } = run({ org: "시험교회", adults: 60, checkin: "2027-01-17", nights: 2, customerType: "church" });
 assert.equal(q.roomOptions, false); assert.deepEqual(q.pensions, []); assert.equal(q.ondolOnly, 20); assert.equal(q.ondol, 20);
 
-// 2. 청년부·고등부, 펜션 요청, 친목(일반 모임), MT 는 객실옵션 1·2
+// 2. 청년부, 펜션 요청, 친목(일반 모임), MT 는 객실옵션 1·2 (10/25 jin: 중고등부는 뺌)
 for (const r of [
   { org: "시험교회 청년부", customerType: "church" },
-  { org: "시험교회 중고등부", customerType: "church" },
   { org: "시험교회", customerType: "church", wantsPension: true },
   { org: "OO고 동창회", customerType: "group" },
   { org: "시험대 경영학과", customerType: "university" },
@@ -274,4 +273,11 @@ console.log("rooms.test 통과");
   const { q: z } = run({ org: "○○교회 고등부", adults: 70, checkin: "2027-07-30", nights: 2, customerType: "church" }, b);
   assert.equal(z.roomOptions, false);
   console.log('펜션 다 참 통과');
+}
+
+// 10/25 jin: 중고등부·고등부는 펜션 옵션 없이 온돌 한 가지
+{
+  const { q: hs } = run({ org: "○○교회 고등부", adults: 70, checkin: "2026-11-13", nights: 1, customerType: "church" });
+  assert.equal(hs.roomOptions, false); assert.deepEqual(hs.pensions, []);
+  console.log('고등부 펜션 없음 통과');
 }
