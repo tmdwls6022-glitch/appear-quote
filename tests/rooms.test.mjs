@@ -235,3 +235,12 @@ console.log("rooms.test 통과");
   assert.ok(run({ adults: 30, checkin: "2026-11-16", nights: 1, bigTruck: true }).q.flags.some((f) => /트럭/.test(f)));
   console.log('10/25 질문 답 통과');
 }
+
+// jin 10/25 Q38 '나': 일요일 밤(일~월)도 주말 — 7~8월 일요일 1박은 평일 −5천 안 깎음
+{
+  const { hasWeekendNight_ } = await import("../kakao-quote/core.js");
+  assert.equal(hasWeekendNight_("2026-11-15", 1), true);
+  assert.equal(hasWeekendNight_("2026-11-16", 1), false);
+  assert.equal(buildQuote_({ checkin: "2027-08-01", nights: 1, adults: 30, customerType: "church" }).unit, 85000);
+  console.log('일요일 밤 주말 통과');
+}

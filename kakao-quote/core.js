@@ -82,11 +82,11 @@ function periodName_(nights) {
 }
 function periodLabel_(p) { return p === '당일' ? '당일' : p.replace('박', '박 '); } // "1박 2일"
 
-// 금요일 밤이나 토요일 밤이 끼면 주말 단가(목금토·금토일)
+// 금·토·일요일 밤이 끼면 주말 단가(목금토·금토일·일월) — jin 10/25 Q38 '나': 일요일 밤(일~월)도 주말
 function hasWeekendNight_(checkin, nights) {
   if (!checkin) return false;
   var d = new Date(checkin + 'T00:00:00');
-  for (var i = 0; i < nights; i++) { var w = (d.getDay() + i) % 7; if (w === 5 || w === 6) return true; }
+  for (var i = 0; i < nights; i++) { var w = (d.getDay() + i) % 7; if (w === 5 || w === 6 || w === 0) return true; }
   return false;
 }
 
